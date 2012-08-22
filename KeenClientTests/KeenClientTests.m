@@ -9,8 +9,8 @@
 #import "KeenClientTests.h"
 #import "KeenClient.h"
 #import <OCMock/OCMock.h>
-#import "JSONKit.h"
 #import "KeenConstants.h"
+#import "KeenJSONSerialization.h"
 
 
 @interface KeenClient (testability)
@@ -25,7 +25,12 @@
 @property (nonatomic) Boolean isRunningTests;
 
 - (NSData *)sendEvents: (NSData *) data returningResponse: (NSURLResponse **) response error: (NSError **) error;
-- (id)convertDate: (id) date;
+
+@end
+
+@interface KeenJSONSerialization (testability)
+
++ (id)convertDate: (id) date;
 
 @end
 
@@ -131,7 +136,7 @@
     NSString *path = [contents objectAtIndex:0];
     NSString *fullPath = [[self eventDirectoryForCollection:@"foo"] stringByAppendingPathComponent:path];
     NSData *data = [NSData dataWithContentsOfFile:fullPath];
-    NSDictionary *deserializedDict = [data objectFromJSONData];
+    NSDictionary *deserializedDict = [KeenJSONSerialization JSONObjectWithData:data options:0 error:nil];
     // make sure timestamp was added
     STAssertNotNil(deserializedDict, @"The event should have been written to disk.");
     STAssertNotNil([deserializedDict objectForKey:@"header"], @"The event should have a header namespace.");
@@ -174,12 +179,12 @@ withHeaderProperties:[NSDictionary dictionaryWithObject:date forKey:@"timestamp"
     NSString *path = [contents objectAtIndex:0];
     NSString *fullPath = [[self eventDirectoryForCollection:@"foo"] stringByAppendingPathComponent:path];
     NSData *data = [NSData dataWithContentsOfFile:fullPath];
-    NSDictionary *deserializedDict = [data objectFromJSONData];
+    NSDictionary *deserializedDict = [KeenJSONSerialization JSONObjectWithData:data options:0 error:nil];
     
     NSLog(@"the dict %@", deserializedDict);
     
     NSString *deserializedDate = [[deserializedDict objectForKey:@"header"] objectForKey:@"timestamp"];
-    NSString *originalDate = [client convertDate:date];
+    NSString *originalDate = [KeenJSONSerialization convertDate:date];
     STAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
 }
 
@@ -220,8 +225,9 @@ withHeaderProperties:[NSDictionary dictionaryWithObject:date forKey:@"timestamp"
     NSHTTPURLResponse *response = [[[NSHTTPURLResponse alloc] initWithURL:nil statusCode:code HTTPVersion:nil headerFields:nil] autorelease];
     
     // serialize the faked out response data
-    NSData *serializedData = [data JSONData];
-    NSString *json = [[NSString alloc] initWithData:serializedData encoding:NSUTF8StringEncoding];    [json release];
+    NSData *serializedData = [KeenJSONSerialization dataWithJSONObject:data
+                                                               options:NSJSONReadingAllowFragments
+                                                                 error:nil];
     
     // set up the response data we're faking out
     [[[mock stub] andReturn:serializedData] sendEvents:[OCMArg any] 

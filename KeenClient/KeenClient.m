@@ -8,12 +8,10 @@
 
 #import "KeenClient.h"
 #import "KeenConstants.h"
-#import "JSONKit.h"
-#import "ISO8601DateFormatter.h"
+#import "KeenJSONSerialization.h"
 
 
 static KeenClient *sharedClient;
-static ISO8601DateFormatter *dateFormatter;
 
 @interface KeenClient ()
 
@@ -135,13 +133,6 @@ static ISO8601DateFormatter *dateFormatter;
 - (void)handleAPIResponse:(NSURLResponse *)response 
                   andData:(NSData *)responseData 
             forEventPaths:(NSDictionary *)eventPaths;
-
-/**
- Converts an NSDate* instance into a correctly formatted ISO-8601 compatible string.
- @param date The NSData* instance to convert.
- @returns An ISO-8601 compatible string representation of the date parameter.
- */
-- (id)convertDate:(id)date;
     
 @end
 
@@ -169,12 +160,6 @@ static ISO8601DateFormatter *dateFormatter;
     
     if (!sharedClient) {
         sharedClient = [[KeenClient alloc] init];
-    }
-    if (!dateFormatter) {
-        dateFormatter = [[ISO8601DateFormatter alloc] init];
-        [dateFormatter setIncludeTime:YES];
-        NSTimeZone *timeZone = [NSTimeZone localTimeZone];
-        [dateFormatter setDefaultTimeZone:timeZone];
     }
 }
 
@@ -295,12 +280,12 @@ static ISO8601DateFormatter *dateFormatter;
                                   event, @"body", nil];
     
     NSError *error = nil;
-    NSData *jsonData = [eventToWrite JSONDataWithOptions:JKSerializeOptionNone 
-                serializeUnsupportedClassesUsingDelegate:self 
-                                                selector:@selector(convertDate:) 
-                                                   error:&error];
-    if (error) {
-        KCLog(@"An error occurred when serializing event to JSON: %@", [error localizedDescription]);
+    NSData *jsonData = nil;
+    @try {
+        jsonData = [KeenJSONSerialization dataWithJSONObject:eventToWrite options:0 error:&error];
+    }
+    @catch (NSException *e) {
+//        KCLog(@"An error occurred when serializing event to JSON: %@", [error localizedDescription]);
         return NO;
     }
     
@@ -388,8 +373,7 @@ static ISO8601DateFormatter *dateFormatter;
             NSData *data = [NSData dataWithContentsOfFile:filePath];
             // deserialize it
             error = nil;
-            NSDictionary *eventDict = [data objectFromJSONDataWithParseOptions:JKParseOptionNone 
-                                                                         error:&error];
+            NSDictionary *eventDict = [KeenJSONSerialization JSONObjectWithData:data options:0 error:&error];
             if (error) {
                 KCLog(@"An error occurred when deserializing a saved event: %@", [error localizedDescription]);
                 continue;
@@ -415,13 +399,13 @@ static ISO8601DateFormatter *dateFormatter;
     
     // first serialize the request dict back to a json string
     error = nil;
-    NSData *data = [requestDict JSONDataWithOptions:JKSerializeOptionNone 
-           serializeUnsupportedClassesUsingDelegate:self
-                                           selector:@selector(convertDate:) 
-                                              error:&error];
-    if (error) {
-        KCLog(@"An error occurred when serializing the final request data back to JSON: %@", 
-              [error localizedDescription]);
+    NSData *data = nil;
+    @try {
+        data = [KeenJSONSerialization dataWithJSONObject:requestDict options:0 error:&error];
+    }
+    @catch (NSException *e) {
+//        KCLog(@"An error occurred when serializing the final request data back to JSON: %@", 
+//              [error localizedDescription]);
         // can't do much here.
         return;
     }
@@ -444,8 +428,7 @@ static ISO8601DateFormatter *dateFormatter;
     if (responseCode == 200) {
         // deserialize the response
         NSError *error = nil;
-        NSDictionary *responseDict = [responseData objectFromJSONDataWithParseOptions:JKParseOptionNone 
-                                                                                error:&error];
+        NSDictionary *responseDict = [KeenJSONSerialization JSONObjectWithData:responseData options:0 error:&error];
         if (error) {
             NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
             KCLog(@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString);
@@ -562,7 +545,7 @@ static ISO8601DateFormatter *dateFormatter;
     // get a file manager.
     NSFileManager *fileManager = [NSFileManager defaultManager];
     // determine the root of the filename.
-    NSString *name = [NSString stringWithFormat:@"%d", (long) [timestamp timeIntervalSince1970]];
+    NSString *name = [NSString stringWithFormat:@"%d", (int)[timestamp timeIntervalSince1970]];
     // get the path to the directory where the file will be written
     NSString *directory = [self eventDirectoryForCollection:collection];
     // start a counter that we'll use to make sure that even if multiple events are written with the same timestamp,
@@ -612,13 +595,6 @@ static ISO8601DateFormatter *dateFormatter;
         KCLog(@"Successfully wrote event to file: %@", file);
     }
     return YES;
-}
-                    
-# pragma mark - NSDate => NSString
-                    
-- (id)convertDate:(id)date {
-    NSString *string = [dateFormatter stringFromDate:date];
-    return string;
 }
 
 # pragma mark - To make testing easier
