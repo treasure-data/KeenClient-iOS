@@ -139,7 +139,11 @@ static KIOEventStore *eventStore;
  Fills the error object with the given message appropriately.
  */
 - (void) handleError:(NSError **)error withErrorMessage:(NSString *)errorMessage;
-    
+
+- (void) callOnSuccessInUploading;
+
+- (void) callOnErrorInUploading:(NSString*)errorCode message:(NSString*)message;
+
 @end
 
 @implementation KeenClient
@@ -618,6 +622,7 @@ static KIOEventStore *eventStore;
         KCLog(@"An error occurred when serializing the final request data back to JSON: %@",
               [error localizedDescription]);
         // can't do much here.
+        [self callOnErrorInUploading:@"data_format" message:[NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]];
         return;
     }
     
@@ -815,6 +820,7 @@ static KIOEventStore *eventStore;
     if (!responseData) {
         KCLog(@"responseData was nil for some reason.  That's not great.");
         KCLog(@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]);
+        [self callOnErrorInUploading:@"server_response" message:[NSString stringWithFormat:@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]]];
         return;
     }
     NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
@@ -828,6 +834,7 @@ static KIOEventStore *eventStore;
         if (error) {
             NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
             KCLog(@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString);
+            [self callOnErrorInUploading:@"server_response" message:[NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString]];
             return;
         }
         // now iterate through the keys of the response, which represent collection names
@@ -866,11 +873,13 @@ static KIOEventStore *eventStore;
                 count++;
             }
         }
+        [self callOnSuccessInUploading];
     } else {
         // response code was NOT 200, which means something else happened. log this.
         KCLog(@"Response code was NOT 200. It was: %ld", (long)responseCode);
         NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
         KCLog(@"Response body was: %@", responseString);
+        [self callOnErrorInUploading:@"server_response" message:[NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode]];
     }            
 }
 
@@ -947,6 +956,20 @@ static KIOEventStore *eventStore;
         return 2;
     }
     return kKeenNumberEventsToForget;
+}
+
+# pragma mark - Extending KeenClient library
+
+- (void) callOnSuccessInUploading {
+    if (self.onSuccessInUploading) {
+        self.onSuccessInUploading();
+    }
+}
+
+- (void) callOnErrorInUploading:(NSString*)errorCode message:(NSString*)message {
+    if (self.onErrorInUploading) {
+        self.onErrorInUploading(errorCode, message);
+    }
 }
 
 @end

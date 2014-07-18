@@ -98,6 +98,12 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 @property (nonatomic, strong) CLLocation *currentLocation;
 
 /**
+ For extending this library
+ */
+@property (nonatomic, strong) void (^onSuccessInUploading) ();
+@property (nonatomic, strong) void (^onErrorInUploading) (NSString* errorCode, NSString* message);
+
+/**
  Call this to retrieve the managed instance of KeenClient and set its project ID and Write/Read Keys
  to the given parameters.
  
