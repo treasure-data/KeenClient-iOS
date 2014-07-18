@@ -972,4 +972,17 @@ static KIOEventStore *eventStore;
     }
 }
 
+- (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
+    dispatch_async(self.uploadQueue, ^{
+        self.onSuccessInUploading = onSuccess;
+        self.onErrorInUploading = onError;
+        
+        [self uploadHelper];
+
+        self.onSuccessInUploading = nil;
+        self.onErrorInUploading = nil;
+    });
+}
+
+
 @end
