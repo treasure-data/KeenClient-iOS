@@ -263,5 +263,8 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 /**
  For extending this library
  */
-NSString * const ERROR_CODE_INVALID_FORMAT = @"invalid_format";
-NSString * const ERROR_CODE_SERVER_RESPONSE = @"server_response";
+#ifndef ERROR_CODE_INVALID_FORMAT
+#define ERROR_CODE_INVALID_FORMAT @"invalid_format"
+#define ERROR_CODE_SERVER_RESPONSE @"server_response"
+#endif
+
