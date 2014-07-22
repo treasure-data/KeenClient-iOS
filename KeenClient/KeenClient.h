@@ -269,3 +269,9 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 #define KCLog(message, ...)if([KeenClient isLoggingEnabled]) NSLog(message, ##__VA_ARGS__)
 
 @end
+
+/**
+ For extending this library
+ */
+NSString * const ERROR_CODE_INVALID_FORMAT = @"invalid_format";
+NSString * const ERROR_CODE_SERVER_RESPONSE = @"server_response";
