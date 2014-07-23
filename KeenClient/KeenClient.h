@@ -155,6 +155,8 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 
 /**
  Returns whether or not logging is currently enabled.
+ 
+ @return true if logging is enabled, false if disabled.
  */
 + (Boolean)isLoggingEnabled;
 
@@ -164,6 +166,12 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
  */
 + (void)clearAllEvents;
 
+
+/**
+ Call this to retrieve an instance of KIOEventStore.
+ 
+ @return An instance of KIOEventStore.
+ */
 + (KIOEventStore *)getEventStore;
 
 /**
@@ -246,6 +254,8 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 
 /**
  Returns the Keen SDK Version
+ 
+ @return The current SDK version string.
  */
 + (NSString *)sdkVersion;
 
