@@ -984,5 +984,8 @@ static KIOEventStore *eventStore;
     });
 }
 
++ (void)initializeEncryptionKey:(NSString*)encryptionKey {
+    [KIOEventStore initializeEncryptionKey:encryptionKey];
+}
 
 @end

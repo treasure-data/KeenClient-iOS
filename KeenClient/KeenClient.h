@@ -103,6 +103,7 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 @property (nonatomic, strong) void (^onSuccessInUploading) ();
 @property (nonatomic, strong) void (^onErrorInUploading) (NSString* errorCode, NSString* message);
 - (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError;
++ (void)initializeEncryptionKey:(NSString*)encryptionKey;
 
 /**
  Call this to retrieve the managed instance of KeenClient and set its project ID and Write/Read Keys

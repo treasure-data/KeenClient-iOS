@@ -78,4 +78,7 @@
  @param offset The offset to start deleting events from.
  */
 - (void)deleteEventsFromOffset: (NSNumber *)offset;
+
++ (void)initializeEncryptionKey:(NSString*)encryptionKey;
+
 @end
