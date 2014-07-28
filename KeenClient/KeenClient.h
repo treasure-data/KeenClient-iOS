@@ -98,11 +98,18 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 @property (nonatomic, strong) CLLocation *currentLocation;
 
 /**
- For extending this library
+ For TD extention
  */
-@property (nonatomic, strong) void (^onSuccessInUploading) ();
-@property (nonatomic, strong) void (^onErrorInUploading) (NSString* errorCode, NSString* message);
+@property (nonatomic, strong) void (^onSuccessInUploadEvents) ();
+@property (nonatomic, strong) void (^onErrorInUploadEvents) (NSString* errorCode, NSString* message);
+@property (nonatomic, strong) void (^onSuccessInAddEvent) ();
+@property (nonatomic, strong) void (^onErrorInAddEvents) (NSString* errorCode, NSString* message);
+
 - (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError;
+- (void)addEventWithCallbacks:(NSDictionary *)event
+            toEventCollection:(NSString *)eventCollection
+                    onSuccess:(void(^)())onSuccess
+                      onError:(void (^)(NSString* errorCode, NSString* message))onError;
 + (void)initializeEncryptionKey:(NSString*)encryptionKey;
 
 /**
@@ -272,10 +279,10 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 @end
 
 /**
- For extending this library
+ For TD extention
  */
-#ifndef ERROR_CODE_INVALID_FORMAT
-#define ERROR_CODE_INVALID_FORMAT @"invalid_format"
+#define ERROR_CODE_INVALID_EVENT @"invalid_event"
+#define ERROR_CODE_DATA_CONVERSION @"data_conversion"
+#define ERROR_CODE_STORAGE_ERROR @"storage_error"
+#define ERROR_CODE_NETWORK_ERROR @"network_error"
 #define ERROR_CODE_SERVER_RESPONSE @"server_response"
-#endif
-

@@ -496,6 +496,8 @@ static NSString *encKey = nil;
 - (void)handleSQLiteFailure: (NSString *) msg {
     NSLog(@"Failed to %@: %@",
           msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]);
+    self.lastErrorMessage = [NSString stringWithFormat:@"Failed to %@: %@",
+                             msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]];
 }
 
 - (void)closeDB {
