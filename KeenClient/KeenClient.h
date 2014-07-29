@@ -282,6 +282,7 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
  For TD extention
  */
 #define ERROR_CODE_INIT_ERROR @"init_error"
+#define ERROR_CODE_INVALID_PARAM @"invalid_param"
 #define ERROR_CODE_INVALID_EVENT @"invalid_event"
 #define ERROR_CODE_DATA_CONVERSION @"data_conversion"
 #define ERROR_CODE_STORAGE_ERROR @"storage_error"
