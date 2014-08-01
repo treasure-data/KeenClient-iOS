@@ -137,7 +137,8 @@ static NSString *encKey = nil;
             eventData = [encryptedBase64 dataUsingEncoding:NSUTF8StringEncoding];
         }
         else {
-            // TODO: error handling
+            KCLog(@"Encryption failed. Storing it as a plain...");
+            encKey = NULL;
         }
     }
 
@@ -239,11 +240,19 @@ static NSString *encKey = nil;
 
             if (encKey) {
                 NSData *decrypted = [self decrypt:[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]];
-                if (decrypted) {
+                NSError *error = NULL;
+                [NSJSONSerialization JSONObjectWithData:decrypted options:0 error:&error];
+                if (!error) {
                     data = decrypted;
                 }
                 else {
-                    // TODO: error handling
+                    KCLog(@"Decryption failed. Trying to hanlde this event as a plain JSON");
+                    [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+                    if (error) {
+                        KCLog(@"This event can't be handled as a plain JSON. Deleting it");
+                        [self deleteEvent:[NSNumber numberWithLongLong:eventId]];
+                        continue;
+                    }
                 }
             }
 
