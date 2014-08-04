@@ -141,7 +141,11 @@ static KIOEventStore *eventStore;
  @return Always return NO.
  */
 - (BOOL)handleError:(NSError **)error withErrorMessage:(NSString *)errorMessage;
-    
+
+- (void)callOnSuccessInUploadEvents;
+
+- (void)callOnErrorInUploadEvents:(NSString*)errorCode message:(NSString*)message;
+
 @end
 
 @implementation KeenClient
@@ -423,6 +427,12 @@ static KIOEventStore *eventStore;
 }
 
 - (BOOL)addEvent:(NSDictionary *)event withKeenProperties:(KeenProperties *)keenProperties toEventCollection:(NSString *)eventCollection error:(NSError **) anError {
+    return [self addEvent:event withKeenProperties:nil toEventCollection:eventCollection error:anError onSuccess:nil onError:nil];
+}
+
+- (BOOL)addEvent:(NSDictionary *)event withKeenProperties:(KeenProperties *)keenProperties toEventCollection:(NSString *)eventCollection error:(NSError **) anError
+       onSuccess:(void(^)())onSuccess
+         onError:(void (^)(NSString* errorCode, NSString* message))onError {
     // make sure the write key has been set - can't do anything without that
     if (![KeenClient validateKey:self.writeKey]) {
         [NSException raise:@"KeenNoWriteKeyProvided" format:@"You tried to add an event without setting a write key, please set one!"];
@@ -430,9 +440,11 @@ static KIOEventStore *eventStore;
 
     // don't do anything if the event itself or the event collection name are invalid somehow.
     if (![self validateEventCollection:eventCollection error:anError]) {
+        onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
         return NO;
     }
     if (![self validateEvent:event withDepth:0 error:anError]) {
+        onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
         return NO;
     }
     
@@ -490,14 +502,20 @@ static KIOEventStore *eventStore;
     NSError *error = nil;
     NSData *jsonData = [self serializeEventToJSON:eventToWrite error:&error];
     if (error) {
+        onError(ERROR_CODE_DATA_CONVERSION, [*anError description]);
         return [self handleError:anError
                 withErrorMessage:[NSString stringWithFormat:@"An error occurred when serializing event to JSON: %@", [error localizedDescription]]
                 underlayingError:error];
     }
     
     // write JSON to store
-    [eventStore addEvent:jsonData collection: eventCollection];
+    eventStore.lastErrorMessage = nil;
+    if (![eventStore addEvent:jsonData collection: eventCollection]) {
+        onError(ERROR_CODE_STORAGE_ERROR, eventStore.lastErrorMessage);
+        return NO;
+    }
     
+    onSuccess();
     // log the event
     if ([KeenClient isLoggingEnabled]) {
         KCLog(@"Event: %@", eventToWrite);
@@ -614,6 +632,7 @@ static KIOEventStore *eventStore;
         KCLog(@"An error occurred when serializing the final request data back to JSON: %@",
               [error localizedDescription]);
         // can't do much here.
+        [self callOnErrorInUploadEvents:ERROR_CODE_DATA_CONVERSION message:[NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]];
         return;
     }
     
@@ -811,6 +830,9 @@ static KIOEventStore *eventStore;
     if (!responseData) {
         KCLog(@"responseData was nil for some reason.  That's not great.");
         KCLog(@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]);
+        
+        NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
+        [self callOnErrorInUploadEvents:(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE) message:[NSString stringWithFormat:@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]]];
         return;
     }
     NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
@@ -824,6 +846,7 @@ static KIOEventStore *eventStore;
         if (error) {
             NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
             KCLog(@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString);
+            [self callOnErrorInUploadEvents:ERROR_CODE_DATA_CONVERSION message:[NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString]];
             return;
         }
         // now iterate through the keys of the response, which represent collection names
@@ -862,11 +885,13 @@ static KIOEventStore *eventStore;
                 count++;
             }
         }
+        [self callOnSuccessInUploadEvents];
     } else {
         // response code was NOT 200, which means something else happened. log this.
         KCLog(@"Response code was NOT 200. It was: %ld", (long)responseCode);
         NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
         KCLog(@"Response body was: %@", responseString);
+        [self callOnErrorInUploadEvents:(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE) message:[NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode]];
     }            
 }
 
@@ -952,6 +977,51 @@ static KIOEventStore *eventStore;
         return 2;
     }
     return kKeenNumberEventsToForget;
+}
+
+# pragma mark - Extending KeenClient library
+
+- (void) callOnSuccessInUploadEvents {
+    if (self.onSuccessInUploadEvents) {
+        self.onSuccessInUploadEvents();
+    }
+}
+
+- (void) callOnErrorInUploadEvents:(NSString*)errorCode message:(NSString*)message {
+    if (self.onErrorInUploadEvents) {
+        self.onErrorInUploadEvents(errorCode, message);
+    }
+}
+
+- (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
+    dispatch_async(self.uploadQueue, ^{
+        self.onSuccessInUploadEvents = onSuccess;
+        self.onErrorInUploadEvents = onError;
+        
+        [self uploadHelper];
+
+        self.onSuccessInUploadEvents = nil;
+        self.onErrorInUploadEvents = nil;
+    });
+}
+
+- (void)addEventWithCallbacks:(NSDictionary *)event
+            toEventCollection:(NSString *)eventCollection
+                    onSuccess:(void(^)())onSuccess
+                      onError:(void (^)(NSString* errorCode, NSString* message))onError {
+    if (!onSuccess)
+        onSuccess = ^(){};
+    
+    if (!onError)
+        onError = ^(NSString* errorCode, NSString* message){};
+
+    NSError *error = [[NSError alloc] init];
+
+    [self addEvent:event withKeenProperties:nil toEventCollection:eventCollection error:&error onSuccess:onSuccess onError:onError];
+}
+
++ (void)initializeEncryptionKey:(NSString*)encryptionKey {
+    [KIOEventStore initializeEncryptionKey:encryptionKey];
 }
 
 @end

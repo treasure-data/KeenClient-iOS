@@ -11,6 +11,9 @@
 #import "KIOEventStore_PrivateMethods.h"
 #import "keen_io_sqlite3.h"
 
+#import "CommonCrypto/CommonCryptor.h"
+static NSString *encKey = nil;
+
 @interface KIOEventStore()
 - (void)closeDB;
 
@@ -128,6 +131,16 @@
 
 - (BOOL)addEvent:(NSData *)eventData collection: (NSString *)coll {
     __block BOOL wasAdded = NO;
+    if (encKey) {
+        NSString *encryptedBase64 = [self encrypt:eventData];
+        if (encryptedBase64) {
+            eventData = [encryptedBase64 dataUsingEncoding:NSUTF8StringEncoding];
+        }
+        else {
+            KCLog(@"Encryption failed. Storing it as a plain...");
+            encKey = NULL;
+        }
+    }
 
     if (!dbIsOpen) {
         KCLog(@"DB is closed, skipping addEvent");
@@ -223,6 +236,24 @@
                 // We don't have an entry in the dictionary yet for this collection
                 // so create one.
                 [events setObject:[NSMutableDictionary dictionary] forKey:coll];
+            }
+
+            if (encKey) {
+                NSData *decrypted = [self decrypt:[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]];
+                NSError *error = NULL;
+                [NSJSONSerialization JSONObjectWithData:decrypted options:0 error:&error];
+                if (!error) {
+                    data = decrypted;
+                }
+                else {
+                    KCLog(@"Decryption failed. Trying to hanlde this event as a plain JSON");
+                    [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+                    if (error) {
+                        KCLog(@"This event can't be handled as a plain JSON. Deleting it");
+                        [self deleteEvent:[NSNumber numberWithLongLong:eventId]];
+                        continue;
+                    }
+                }
             }
 
             [[events objectForKey:coll] setObject:data forKey:[NSNumber numberWithUnsignedLongLong:eventId]];
@@ -474,6 +505,8 @@
 - (void)handleSQLiteFailure: (NSString *) msg {
     NSLog(@"Failed to %@: %@",
           msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]);
+    self.lastErrorMessage = [NSString stringWithFormat:@"Failed to %@: %@",
+                             msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]];
 }
 
 - (void)closeDB {
@@ -551,5 +584,66 @@
     return iso8601;
 }
 
++ (void)initializeEncryptionKey:(NSString*)encryptionKey {
+    encKey = encryptionKey;
+}
+
+- (NSData*)encdecBase:(int)mode data:(NSData*)data {
+    if (encKey == nil) {
+        return nil;
+    }
+    
+    char keyBuf[kCCKeySizeAES128+1];
+    bzero(keyBuf, sizeof(keyBuf));
+    
+    [encKey getCString:keyBuf maxLength:sizeof(keyBuf) encoding:NSUTF8StringEncoding];
+    
+    size_t buflen = [data length] + kCCBlockSizeAES128;
+    void *buf = malloc(buflen);
+    
+    size_t proccessedBytes = 0;
+    CCCryptorStatus status = CCCrypt(mode, kCCAlgorithmAES128, kCCOptionPKCS7Padding | kCCOptionECBMode,
+                                     keyBuf, kCCKeySizeAES128, NULL, [data bytes], [data length],
+                                     buf, buflen, &proccessedBytes);
+
+    if (status != kCCSuccess) {
+        free(buf);
+        return nil;
+    }
+    
+    NSData *result = [NSData dataWithBytes:buf length:proccessedBytes];
+    free(buf);
+    return result;
+}
+
+- (NSString*) base64Encode:(NSData*)data {
+    NSString *encodeded;
+    if ([data respondsToSelector:@selector(base64EncodedStringWithOptions:)]) {
+        encodeded = [data base64EncodedStringWithOptions:kNilOptions]; // iOS7 and later
+    } else {
+        encodeded = [data base64Encoding]; // iOS6 and prior
+    }
+    return encodeded;
+}
+
+- (NSData*) base64Decode:(NSString*)data {
+    NSData* decodeded;
+    if ([NSData instancesRespondToSelector:@selector(initWithBase64EncodedString:options:)]) {
+        decodeded = [[NSData alloc] initWithBase64EncodedString:data options:kNilOptions];
+    } else {
+        decodeded = [[NSData alloc] initWithBase64Encoding:data];
+    }
+    return decodeded;
+}
+
+- (NSString*)encrypt:(NSData*)data {
+    NSData *encrypted =[self encdecBase:kCCEncrypt data:data];
+    return [self base64Encode:encrypted];
+}
+
+- (NSData *)decrypt:(NSString*)encryptedBase64 {
+    NSData *decrypted = [self base64Decode:encryptedBase64];
+    return [self encdecBase:kCCDecrypt data:decrypted];
+}
 
 @end

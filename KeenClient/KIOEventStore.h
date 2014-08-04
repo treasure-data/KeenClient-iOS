@@ -13,6 +13,8 @@
 // The project ID for this store.
 @property (nonatomic, strong) NSString *projectId;
 
+@property (nonatomic, strong) NSString *lastErrorMessage;
+
  /**
   Reset any pending events so they can be resent.
   */
@@ -78,4 +80,7 @@
  @param offset The offset to start deleting events from.
  */
 - (void)deleteEventsFromOffset: (NSNumber *)offset;
+
++ (void)initializeEncryptionKey:(NSString*)encryptionKey;
+
 @end

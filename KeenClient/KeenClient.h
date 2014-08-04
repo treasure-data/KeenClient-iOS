@@ -98,6 +98,21 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 @property (nonatomic, strong) CLLocation *currentLocation;
 
 /**
+ For TD extention
+ */
+@property (nonatomic, strong) void (^onSuccessInUploadEvents) ();
+@property (nonatomic, strong) void (^onErrorInUploadEvents) (NSString* errorCode, NSString* message);
+@property (nonatomic, strong) void (^onSuccessInAddEvent) ();
+@property (nonatomic, strong) void (^onErrorInAddEvents) (NSString* errorCode, NSString* message);
+
+- (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError;
+- (void)addEventWithCallbacks:(NSDictionary *)event
+            toEventCollection:(NSString *)eventCollection
+                    onSuccess:(void(^)())onSuccess
+                      onError:(void (^)(NSString* errorCode, NSString* message))onError;
++ (void)initializeEncryptionKey:(NSString*)encryptionKey;
+
+/**
  Call this to retrieve the managed instance of KeenClient and set its project ID and Write/Read Keys
  to the given parameters.
  
@@ -266,3 +281,14 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 #define KCLog(message, ...)if([KeenClient isLoggingEnabled]) NSLog(message, ##__VA_ARGS__)
 
 @end
+
+/**
+ For TD extention
+ */
+#define ERROR_CODE_INIT_ERROR @"init_error"
+#define ERROR_CODE_INVALID_PARAM @"invalid_param"
+#define ERROR_CODE_INVALID_EVENT @"invalid_event"
+#define ERROR_CODE_DATA_CONVERSION @"data_conversion"
+#define ERROR_CODE_STORAGE_ERROR @"storage_error"
+#define ERROR_CODE_NETWORK_ERROR @"network_error"
+#define ERROR_CODE_SERVER_RESPONSE @"server_response"
