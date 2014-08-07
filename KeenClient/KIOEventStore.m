@@ -241,8 +241,10 @@ static NSString *encKey = nil;
             if (encKey) {
                 NSData *decrypted = [self decrypt:[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]];
                 NSError *error = NULL;
-                [NSJSONSerialization JSONObjectWithData:decrypted options:0 error:&error];
-                if (!error) {
+                if (decrypted) {
+                    [NSJSONSerialization JSONObjectWithData:decrypted options:0 error:&error];
+                }
+                if (decrypted && !error) {
                     data = decrypted;
                 }
                 else {
@@ -254,6 +256,16 @@ static NSString *encKey = nil;
                         continue;
                     }
                 }
+            }
+            else {
+                NSError *error = NULL;
+                [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+                if (error) {
+                    KCLog(@"This event can't be handled as a plain JSON. Deleting it");
+                    [self deleteEvent:[NSNumber numberWithLongLong:eventId]];
+                    continue;
+                }
+
             }
 
             [[events objectForKey:coll] setObject:data forKey:[NSNumber numberWithUnsignedLongLong:eventId]];
