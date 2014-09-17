@@ -12,6 +12,8 @@
 #import "keen_io_sqlite3.h"
 
 #import "CommonCrypto/CommonCryptor.h"
+#import "MF_Base64Additions.h"
+
 static NSString *encKey = nil;
 
 @interface KIOEventStore()
@@ -630,21 +632,27 @@ static NSString *encKey = nil;
 
 - (NSString*) base64Encode:(NSData*)data {
     NSString *encodeded;
-    if ([data respondsToSelector:@selector(base64EncodedStringWithOptions:)]) {
+    /*
+     if ([data respondsToSelector:@selector(base64EncodedStringWithOptions:)]) {
         encodeded = [data base64EncodedStringWithOptions:kNilOptions]; // iOS7 and later
     } else {
         encodeded = [data base64Encoding]; // iOS6 and prior
     }
+     */
+    encodeded = [MF_Base64Codec base64StringFromData:data];
     return encodeded;
 }
 
 - (NSData*) base64Decode:(NSString*)data {
     NSData* decodeded;
+    /*
     if ([NSData instancesRespondToSelector:@selector(initWithBase64EncodedString:options:)]) {
         decodeded = [[NSData alloc] initWithBase64EncodedString:data options:kNilOptions];
     } else {
         decodeded = [[NSData alloc] initWithBase64Encoding:data];
     }
+     */
+    decodeded = [MF_Base64Codec dataFromBase64String:data];
     return decodeded;
 }
 
