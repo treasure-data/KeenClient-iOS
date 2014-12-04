@@ -150,8 +150,7 @@ static NSString *encKey = nil;
     }
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(self.dbQueue, ^{
+    dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(insert_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to add event statement"];
             [self closeDB];
@@ -178,12 +177,7 @@ static NSString *encKey = nil;
         keen_io_sqlite3_reset(insert_stmt);
         // Clears off the bindings for future uses.
         keen_io_sqlite3_clear_bindings(insert_stmt);
-        
-        dispatch_semaphore_signal(sema);
     });
-    
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-    dispatch_release(sema);
     
     return wasAdded;
 }
@@ -205,8 +199,7 @@ static NSString *encKey = nil;
     }
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(self.dbQueue, ^{
+    dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(find_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to find statement"];
         }
@@ -276,12 +269,7 @@ static NSString *encKey = nil;
         // Reset things
         keen_io_sqlite3_reset(find_stmt);
         keen_io_sqlite3_clear_bindings(find_stmt);
-        
-        dispatch_semaphore_signal(sema);
     });
-    
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-    dispatch_release(sema);
     
     return events;
 }
@@ -328,8 +316,7 @@ static NSString *encKey = nil;
     }
 
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(self.dbQueue, ^{
+    dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(count_pending_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to count pending statement"];
         }
@@ -340,11 +327,7 @@ static NSString *encKey = nil;
         }
         keen_io_sqlite3_reset(count_pending_stmt);
         keen_io_sqlite3_clear_bindings(count_pending_stmt);
-        dispatch_semaphore_signal(sema);
     });
-    
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-    dispatch_release(sema);
     
     return eventCount;
 }
@@ -358,8 +341,7 @@ static NSString *encKey = nil;
     }
 
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(self.dbQueue, ^{
+    dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(count_all_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to total event statement"];
         }
@@ -370,12 +352,7 @@ static NSString *encKey = nil;
         }
         keen_io_sqlite3_reset(count_all_stmt);
         keen_io_sqlite3_clear_bindings(count_all_stmt);
-        
-        dispatch_semaphore_signal(sema);
     });
-    
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-    dispatch_release(sema);
     
     return eventCount;
 }
@@ -464,8 +441,7 @@ static NSString *encKey = nil;
     self.dbQueue = dispatch_queue_create("io.keen.sqlite", DISPATCH_QUEUE_SERIAL);
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(self.dbQueue, ^{
+    dispatch_sync(self.dbQueue, ^{
         // initialize sqlite ourselves so we can config
         keen_io_sqlite3_shutdown();
         keen_io_sqlite3_config(SQLITE_CONFIG_MULTITHREAD);
@@ -477,11 +453,7 @@ static NSString *encKey = nil;
             [self handleSQLiteFailure:@"create database"];
         }
         dbIsOpen = wasOpened;
-        dispatch_semaphore_signal(sema);
     });
-    
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-    dispatch_release(sema);
     
     return wasOpened;
 }
@@ -495,8 +467,7 @@ static NSString *encKey = nil;
     }
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(self.dbQueue, ^{
+    dispatch_sync(self.dbQueue, ^{
         char *err;
         NSString *sql = [NSString stringWithFormat:@"CREATE TABLE IF NOT EXISTS 'events' (ID INTEGER PRIMARY KEY AUTOINCREMENT, collection TEXT, projectId TEXT, eventData BLOB, pending INTEGER, dateCreated TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"];
         if (keen_io_sqlite3_exec(keen_dbname, [sql UTF8String], NULL, NULL, &err) != SQLITE_OK) {
@@ -506,11 +477,7 @@ static NSString *encKey = nil;
         } else {
             wasCreated = YES;
         }
-        dispatch_semaphore_signal(sema);
     });
-    
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-    dispatch_release(sema);
 
 
     return wasCreated;
@@ -525,30 +492,22 @@ static NSString *encKey = nil;
 
 - (void)closeDB {
     // Free all the prepared statements. This is safe on null pointers.
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-    dispatch_async(self.dbQueue, ^{
-        keen_io_sqlite3_finalize(insert_stmt);
-        keen_io_sqlite3_finalize(find_stmt);
-        keen_io_sqlite3_finalize(count_all_stmt);
-        keen_io_sqlite3_finalize(count_pending_stmt);
-        keen_io_sqlite3_finalize(make_pending_stmt);
-        keen_io_sqlite3_finalize(reset_pending_stmt);
-        keen_io_sqlite3_finalize(purge_stmt);
-        keen_io_sqlite3_finalize(delete_stmt);
-        keen_io_sqlite3_finalize(delete_all_stmt);
-        keen_io_sqlite3_finalize(age_out_stmt);
-        keen_io_sqlite3_finalize(convert_date_stmt);
-        
-        // Free our DB. This is safe on null pointers.
-        keen_io_sqlite3_close(keen_dbname);
-        // Reset state in case it matters.
-        dbIsOpen = NO;
-        
-        dispatch_semaphore_signal(sema);
-    });
+    keen_io_sqlite3_finalize(insert_stmt);
+    keen_io_sqlite3_finalize(find_stmt);
+    keen_io_sqlite3_finalize(count_all_stmt);
+    keen_io_sqlite3_finalize(count_pending_stmt);
+    keen_io_sqlite3_finalize(make_pending_stmt);
+    keen_io_sqlite3_finalize(reset_pending_stmt);
+    keen_io_sqlite3_finalize(purge_stmt);
+    keen_io_sqlite3_finalize(delete_stmt);
+    keen_io_sqlite3_finalize(delete_all_stmt);
+    keen_io_sqlite3_finalize(age_out_stmt);
+    keen_io_sqlite3_finalize(convert_date_stmt);
     
-    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
-    dispatch_release(sema);
+    // Free our DB. This is safe on null pointers.
+    keen_io_sqlite3_close(keen_dbname);
+    // Reset state in case it matters.
+    dbIsOpen = NO;
 }
 
 - (id)convertNSDateToISO8601:(id)date {
@@ -582,18 +541,26 @@ static NSString *encKey = nil;
         offsetString = [@"-" stringByAppendingString:offsetString];
     }
     
-    // bind
-    if (keen_io_sqlite3_bind_text(convert_date_stmt, 1, [[NSString stringWithFormat:@"%f", [date timeIntervalSince1970]] UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
-        [self handleSQLiteFailure:@"date conversion"];
-        [self closeDB];
-    }
-    keen_io_sqlite3_step(convert_date_stmt);
-    
-    NSString *iso8601 = [[NSString stringWithUTF8String:(char *)keen_io_sqlite3_column_text(convert_date_stmt, 0)] stringByAppendingString:offsetString];
-    
-    // reset things
-    keen_io_sqlite3_reset(convert_date_stmt);
-    keen_io_sqlite3_clear_bindings(convert_date_stmt);
+    __block NSString *iso8601 = nil;
+    dispatch_sync(self.dbQueue, ^{
+        // bind
+        if (keen_io_sqlite3_bind_text(convert_date_stmt, 1, [[NSString stringWithFormat:@"%f", [date timeIntervalSince1970]] UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+            [self handleSQLiteFailure:@"bind date to date conversion statement"];
+            [self closeDB];
+        }
+        
+        if (keen_io_sqlite3_step(convert_date_stmt) == SQLITE_ROW) {
+            iso8601 = [[NSString stringWithUTF8String:(char *)keen_io_sqlite3_column_text(convert_date_stmt, 0)] stringByAppendingString:offsetString];
+        }
+        else {
+            [self handleSQLiteFailure:@"date conversion"];
+            [self closeDB];
+        }
+        
+        // reset things
+        keen_io_sqlite3_reset(convert_date_stmt);
+        keen_io_sqlite3_clear_bindings(convert_date_stmt);
+    });
     
     return iso8601;
 }
