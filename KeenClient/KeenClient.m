@@ -470,11 +470,15 @@ static KIOEventStore *eventStore;
 
     // don't do anything if the event itself or the event collection name are invalid somehow.
     if (![self validateEventCollection:eventCollection error:anError]) {
-        onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        if (onError) {
+            onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        }
         return NO;
     }
     if (![self validateEvent:event withDepth:0 error:anError]) {
-        onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        if (onError) {
+            onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        }
         return NO;
     }
     
