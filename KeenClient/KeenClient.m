@@ -536,7 +536,9 @@ static KIOEventStore *eventStore;
     NSError *error = nil;
     NSData *jsonData = [self serializeEventToJSON:eventToWrite error:&error];
     if (error) {
-        onError(ERROR_CODE_DATA_CONVERSION, [*anError description]);
+        if (onError) {
+            onError(ERROR_CODE_DATA_CONVERSION, [*anError description]);
+        }
         return [self handleError:anError
                 withErrorMessage:[NSString stringWithFormat:@"An error occurred when serializing event to JSON: %@", [error localizedDescription]]
                 underlayingError:error];
@@ -545,11 +547,15 @@ static KIOEventStore *eventStore;
     // write JSON to store
     eventStore.lastErrorMessage = nil;
     if (![eventStore addEvent:jsonData collection: eventCollection]) {
-        onError(ERROR_CODE_STORAGE_ERROR, eventStore.lastErrorMessage);
+        if (onError) {
+            onError(ERROR_CODE_STORAGE_ERROR, eventStore.lastErrorMessage);
+        }
         return NO;
     }
     
-    onSuccess();
+    if (onSuccess) {
+        onSuccess();
+    }
     // log the event
     if ([KeenClient isLoggingEnabled]) {
         KCLog(@"Event: %@", eventToWrite);
