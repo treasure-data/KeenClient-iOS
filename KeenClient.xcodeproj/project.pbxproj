@@ -46,7 +46,6 @@
 		015D308B1822E8D200F8735B /* libOCMock.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 015D308A1822E8D200F8735B /* libOCMock.a */; };
 		017EE12214E30C96000F3868 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 017EE12114E30C96000F3868 /* Foundation.framework */; };
 		017EE12814E30C96000F3868 /* KeenClient.m in Sources */ = {isa = PBXBuildFile; fileRef = 017EE12714E30C96000F3868 /* KeenClient.m */; };
-		017EE13014E30C96000F3868 /* SenTestingKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 017EE12F14E30C96000F3868 /* SenTestingKit.framework */; };
 		017EE13214E30C96000F3868 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 017EE13114E30C96000F3868 /* UIKit.framework */; };
 		017EE13314E30C96000F3868 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 017EE12114E30C96000F3868 /* Foundation.framework */; };
 		017EE13614E30C96000F3868 /* libKeenClient.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 017EE11E14E30C96000F3868 /* libKeenClient.a */; };
@@ -54,8 +53,6 @@
 		017EE13F14E30C96000F3868 /* KeenClientTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 017EE13E14E30C96000F3868 /* KeenClientTests.m */; };
 		01BA1B0514E895BC00CF9F84 /* KeenConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = 01BA1B0314E895BC00CF9F84 /* KeenConstants.h */; };
 		01BA1B0614E895BC00CF9F84 /* KeenConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = 01BA1B0414E895BC00CF9F84 /* KeenConstants.m */; };
-		6B5B5C1A19C98A78006BA1B3 /* MF_Base64Additions.h in Headers */ = {isa = PBXBuildFile; fileRef = 6B5B5C1819C98A78006BA1B3 /* MF_Base64Additions.h */; };
-		6B5B5C1B19C98A78006BA1B3 /* MF_Base64Additions.m in Sources */ = {isa = PBXBuildFile; fileRef = 6B5B5C1919C98A78006BA1B3 /* MF_Base64Additions.m */; };
 		1296398D19C10B8500B2B653 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1296398C19C10B8500B2B653 /* Cocoa.framework */; };
 		1296398E19C10D0000B2B653 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		1296398F19C10D0000B2B653 /* keen_io_sqlite3ext.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F2197586EE00051390 /* keen_io_sqlite3ext.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -67,13 +64,15 @@
 		1296399519C10D2C00B2B653 /* KeenProperties.m in Sources */ = {isa = PBXBuildFile; fileRef = 012E8A551672B9A90021F6FA /* KeenProperties.m */; };
 		1296399619C10D2C00B2B653 /* KeenConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = 01BA1B0414E895BC00CF9F84 /* KeenConstants.m */; };
 		1296399719C10D2C00B2B653 /* KIOEventStore.m in Sources */ = {isa = PBXBuildFile; fileRef = CA6410D718E37E7C00E53E3C /* KIOEventStore.m */; };
-		1296399819C10D4000B2B653 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-checker"; }; };
+		1296399819C10D4000B2B653 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-all-checks"; }; };
+		6B5B5C1A19C98A78006BA1B3 /* MF_Base64Additions.h in Headers */ = {isa = PBXBuildFile; fileRef = 6B5B5C1819C98A78006BA1B3 /* MF_Base64Additions.h */; };
+		6B5B5C1B19C98A78006BA1B3 /* MF_Base64Additions.m in Sources */ = {isa = PBXBuildFile; fileRef = 6B5B5C1919C98A78006BA1B3 /* MF_Base64Additions.m */; };
 		CA6410D818E37E7C00E53E3C /* KIOEventStore.h in Headers */ = {isa = PBXBuildFile; fileRef = CA6410D618E37E7C00E53E3C /* KIOEventStore.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		CA6410D918E37E7C00E53E3C /* KIOEventStore.m in Sources */ = {isa = PBXBuildFile; fileRef = CA6410D718E37E7C00E53E3C /* KIOEventStore.m */; };
 		CA6410E218E39F3A00E53E3C /* KIOEventStoreTests.m in Sources */ = {isa = PBXBuildFile; fileRef = CA6410E118E39F3A00E53E3C /* KIOEventStoreTests.m */; };
-		DE34F6F3197586EE00051390 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-checker"; }; };
-		DE34F6F4197586EE00051390 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-checker"; }; };
-		DE34F6F5197586EE00051390 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-checker"; }; };
+		DE34F6F3197586EE00051390 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-all-checks"; }; };
+		DE34F6F4197586EE00051390 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-all-checks"; }; };
+		DE34F6F5197586EE00051390 /* keen_io_sqlite3.c in Sources */ = {isa = PBXBuildFile; fileRef = DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */; settings = {COMPILER_FLAGS = "-w -Xanalyzer -analyzer-disable-all-checks"; }; };
 		DE34F6F6197586EE00051390 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		DE34F6F7197586EE00051390 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		DE34F6F8197586EE00051390 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -143,8 +142,7 @@
 		017EE12514E30C96000F3868 /* KeenClient-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "KeenClient-Prefix.pch"; sourceTree = "<group>"; };
 		017EE12614E30C96000F3868 /* KeenClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KeenClient.h; sourceTree = "<group>"; };
 		017EE12714E30C96000F3868 /* KeenClient.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KeenClient.m; sourceTree = "<group>"; };
-		017EE12E14E30C96000F3868 /* KeenClientTests.octest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KeenClientTests.octest; sourceTree = BUILT_PRODUCTS_DIR; };
-		017EE12F14E30C96000F3868 /* SenTestingKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SenTestingKit.framework; path = Library/Frameworks/SenTestingKit.framework; sourceTree = DEVELOPER_DIR; };
+		017EE12E14E30C96000F3868 /* KeenClientTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KeenClientTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		017EE13114E30C96000F3868 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = Library/Frameworks/UIKit.framework; sourceTree = DEVELOPER_DIR; };
 		017EE13914E30C96000F3868 /* KeenClientTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "KeenClientTests-Info.plist"; sourceTree = "<group>"; };
 		017EE13B14E30C96000F3868 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -153,8 +151,6 @@
 		01A9A34414FE953D0082AB22 /* index.markdown */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = index.markdown; path = docs/index.markdown; sourceTree = "<group>"; };
 		01BA1B0314E895BC00CF9F84 /* KeenConstants.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KeenConstants.h; sourceTree = "<group>"; };
 		01BA1B0414E895BC00CF9F84 /* KeenConstants.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KeenConstants.m; sourceTree = "<group>"; };
-		6B5B5C1819C98A78006BA1B3 /* MF_Base64Additions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MF_Base64Additions.h; sourceTree = "<group>"; };
-		6B5B5C1919C98A78006BA1B3 /* MF_Base64Additions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MF_Base64Additions.m; sourceTree = "<group>"; };
 		1296396319C10AD200B2B653 /* libKeenClient-Cocoa.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libKeenClient-Cocoa.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1296396419C10AD200B2B653 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		1296396719C10AD200B2B653 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -162,6 +158,8 @@
 		1296396919C10AD200B2B653 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		1296397519C10AD200B2B653 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		1296398C19C10B8500B2B653 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
+		6B5B5C1819C98A78006BA1B3 /* MF_Base64Additions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MF_Base64Additions.h; sourceTree = "<group>"; };
+		6B5B5C1919C98A78006BA1B3 /* MF_Base64Additions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MF_Base64Additions.m; sourceTree = "<group>"; };
 		CA6410D618E37E7C00E53E3C /* KIOEventStore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KIOEventStore.h; sourceTree = "<group>"; };
 		CA6410D718E37E7C00E53E3C /* KIOEventStore.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KIOEventStore.m; sourceTree = "<group>"; wrapsLines = 0; };
 		CA6410E018E39F3A00E53E3C /* KIOEventStoreTests.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KIOEventStoreTests.h; sourceTree = "<group>"; };
@@ -205,7 +203,6 @@
 			files = (
 				015D308B1822E8D200F8735B /* libOCMock.a in Frameworks */,
 				012E8A5E1672BFA00021F6FA /* CoreLocation.framework in Frameworks */,
-				017EE13014E30C96000F3868 /* SenTestingKit.framework in Frameworks */,
 				017EE13214E30C96000F3868 /* UIKit.framework in Frameworks */,
 				017EE13314E30C96000F3868 /* Foundation.framework in Frameworks */,
 				017EE13614E30C96000F3868 /* libKeenClient.a in Frameworks */,
@@ -270,7 +267,7 @@
 			isa = PBXGroup;
 			children = (
 				017EE11E14E30C96000F3868 /* libKeenClient.a */,
-				017EE12E14E30C96000F3868 /* KeenClientTests.octest */,
+				017EE12E14E30C96000F3868 /* KeenClientTests.xctest */,
 				0111013314EF709A009794A5 /* libKeenClient-Simulator.a */,
 				0111014B14EF70AB009794A5 /* libKeenClient-Device.a */,
 				1296396319C10AD200B2B653 /* libKeenClient-Cocoa.a */,
@@ -284,7 +281,6 @@
 				1296398C19C10B8500B2B653 /* Cocoa.framework */,
 				CA795C4D18E32BAB00EBDFC4 /* libsqlite3.dylib */,
 				017EE12114E30C96000F3868 /* Foundation.framework */,
-				017EE12F14E30C96000F3868 /* SenTestingKit.framework */,
 				017EE13114E30C96000F3868 /* UIKit.framework */,
 				1296396419C10AD200B2B653 /* Cocoa.framework */,
 				1296397519C10AD200B2B653 /* XCTest.framework */,
@@ -505,8 +501,8 @@
 			);
 			name = KeenClientTests;
 			productName = KeenClientTests;
-			productReference = 017EE12E14E30C96000F3868 /* KeenClientTests.octest */;
-			productType = "com.apple.product-type.bundle.ocunit-test";
+			productReference = 017EE12E14E30C96000F3868 /* KeenClientTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		1296396219C10AD200B2B653 /* KeenClient-Cocoa */ = {
 			isa = PBXNativeTarget;
@@ -531,7 +527,7 @@
 		017EE11514E30C95000F3868 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastTestingUpgradeCheck = 0610;
+				LastTestingUpgradeCheck = 0710;
 				LastUpgradeCheck = 0610;
 				ORGANIZATIONNAME = "Keen Labs";
 				TargetAttributes = {
@@ -904,7 +900,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(SDKROOT)/Developer/Library/Frameworks",
-					"$(DEVELOPER_LIBRARY_DIR)/Frameworks",
+					"$(inherited)",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "KeenClient/KeenClient-Prefix.pch";
@@ -923,7 +919,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VALID_ARCHS = "armv7 armv7s";
 				WARNING_CFLAGS = "";
-				WRAPPER_EXTENSION = octest;
 			};
 			name = Debug;
 		};
@@ -933,7 +928,7 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(SDKROOT)/Developer/Library/Frameworks",
-					"$(DEVELOPER_LIBRARY_DIR)/Frameworks",
+					"$(inherited)",
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "KeenClient/KeenClient-Prefix.pch";
@@ -947,7 +942,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				VALID_ARCHS = "armv7 armv7s";
 				WARNING_CFLAGS = "";
-				WRAPPER_EXTENSION = octest;
 			};
 			name = Release;
 		};

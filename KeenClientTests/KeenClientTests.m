@@ -67,7 +67,7 @@
     if ([fileManager fileExistsAtPath:[self keenDirectory]]) {
         [fileManager removeItemAtPath:[self keenDirectory] error:&error];
         if (error) {
-            STFail(@"No error should be thrown when cleaning up: %@", [error localizedDescription]);
+            XCTFail(@"No error should be thrown when cleaning up: %@", [error localizedDescription]);
         }
     }
     [super tearDown];
@@ -75,53 +75,53 @@
 
 - (void)testInitWithProjectId{
     KeenClient *client = [[KeenClient alloc] initWithProjectId:@"something" andWriteKey:@"wk" andReadKey:@"rk"];
-    STAssertEqualObjects(@"something", client.projectId, @"init with a valid project id should work");
-    STAssertEqualObjects(@"wk", client.writeKey, @"init with a valid project id should work");
-    STAssertEqualObjects(@"rk", client.readKey, @"init with a valid project id should work");
+    XCTAssertEqualObjects(@"something", client.projectId, @"init with a valid project id should work");
+    XCTAssertEqualObjects(@"wk", client.writeKey, @"init with a valid project id should work");
+    XCTAssertEqualObjects(@"rk", client.readKey, @"init with a valid project id should work");
     
     KeenClient *client2 = [[KeenClient alloc] initWithProjectId:@"another" andWriteKey:@"wk2" andReadKey:@"rk2"];
-    STAssertEqualObjects(@"another", client2.projectId, @"init with a valid project id should work");
-    STAssertEqualObjects(@"wk2", client2.writeKey, @"init with a valid project id should work");
-    STAssertEqualObjects(@"rk2", client2.readKey, @"init with a valid project id should work");
-    STAssertTrue(client != client2, @"Another init should return a separate instance");
+    XCTAssertEqualObjects(@"another", client2.projectId, @"init with a valid project id should work");
+    XCTAssertEqualObjects(@"wk2", client2.writeKey, @"init with a valid project id should work");
+    XCTAssertEqualObjects(@"rk2", client2.readKey, @"init with a valid project id should work");
+    XCTAssertTrue(client != client2, @"Another init should return a separate instance");
     
     client = [[KeenClient alloc] initWithProjectId:nil andWriteKey:@"wk" andReadKey:@"rk"];
-    STAssertNil(client, @"init with a nil project ID should return nil");
+    XCTAssertNil(client, @"init with a nil project ID should return nil");
 }
 
 - (void)testInstanceClient {
     KeenClient *client = [[KeenClient alloc] init];
-    STAssertNil(client.projectId, @"a client's project id should be nil at first");
-    STAssertNil(client.writeKey, @"a client's write key should be nil at first");
-    STAssertNil(client.readKey, @"a client's read key should be nil at first");
+    XCTAssertNil(client.projectId, @"a client's project id should be nil at first");
+    XCTAssertNil(client.writeKey, @"a client's write key should be nil at first");
+    XCTAssertNil(client.readKey, @"a client's read key should be nil at first");
 
     KeenClient *client2 = [[KeenClient alloc] init];
-    STAssertTrue(client != client2, @"Another init should return a separate instance");
+    XCTAssertTrue(client != client2, @"Another init should return a separate instance");
 }
 
 - (void)testSharedClientWithProjectId{
     KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-    STAssertEquals(@"id", client.projectId, @"sharedClientWithProjectId with a non-nil project id should work.");
-    STAssertEqualObjects(@"wk", client.writeKey, @"init with a valid project id should work");
-    STAssertEqualObjects(@"rk", client.readKey, @"init with a valid project id should work");
+    XCTAssertEqual(@"id", client.projectId, @"sharedClientWithProjectId with a non-nil project id should work.");
+    XCTAssertEqualObjects(@"wk", client.writeKey, @"init with a valid project id should work");
+    XCTAssertEqualObjects(@"rk", client.readKey, @"init with a valid project id should work");
     
     KeenClient *client2 = [KeenClient sharedClientWithProjectId:@"other" andWriteKey:@"wk2" andReadKey:@"rk2"];
-    STAssertEqualObjects(client, client2, @"sharedClient should return the same instance");
-    STAssertEqualObjects(@"wk2", client2.writeKey, @"sharedClient with a valid project id should work");
-    STAssertEqualObjects(@"rk2", client2.readKey, @"sharedClient with a valid project id should work");
+    XCTAssertEqualObjects(client, client2, @"sharedClient should return the same instance");
+    XCTAssertEqualObjects(@"wk2", client2.writeKey, @"sharedClient with a valid project id should work");
+    XCTAssertEqualObjects(@"rk2", client2.readKey, @"sharedClient with a valid project id should work");
     
     client = [KeenClient sharedClientWithProjectId:nil andWriteKey:@"wk" andReadKey:@"rk"];
-    STAssertNil(client, @"sharedClient with an invalid project id should return nil");
+    XCTAssertNil(client, @"sharedClient with an invalid project id should return nil");
 }
 
 - (void)testSharedClient {
     KeenClient *client = [KeenClient sharedClient];
-    STAssertNil(client.projectId, @"a client's project id should be nil at first");
-    STAssertNil(client.writeKey, @"a client's write key should be nil at first");
-    STAssertNil(client.readKey, @"a client's read key should be nil at first");
+    XCTAssertNil(client.projectId, @"a client's project id should be nil at first");
+    XCTAssertNil(client.writeKey, @"a client's write key should be nil at first");
+    XCTAssertNil(client.readKey, @"a client's read key should be nil at first");
     
     KeenClient *client2 = [KeenClient sharedClient];
-    STAssertEqualObjects(client, client2, @"sharedClient should return the same instance");
+    XCTAssertEqualObjects(client, client2, @"sharedClient should return the same instance");
 }
 
 - (void)testAddEvent {
@@ -130,72 +130,72 @@
     
     // nil dict should should do nothing
     NSError *error = nil;
-    STAssertFalse([client addEvent:nil toEventCollection:@"foo" error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"nil dict should return NO");
+    XCTAssertFalse([client addEvent:nil toEventCollection:@"foo" error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"nil dict should return NO");
     error = nil;
 
-    STAssertFalse([clientI addEvent:nil toEventCollection:@"foo" error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"nil dict should return NO");
+    XCTAssertFalse([clientI addEvent:nil toEventCollection:@"foo" error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"nil dict should return NO");
     error = nil;
     
     // nil collection should do nothing
-    STAssertFalse([client addEvent:[NSDictionary dictionary] toEventCollection:nil error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"nil collection should return NO");
+    XCTAssertFalse([client addEvent:[NSDictionary dictionary] toEventCollection:nil error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"nil collection should return NO");
     error = nil;
 
-    STAssertFalse([clientI addEvent:[NSDictionary dictionary] toEventCollection:nil error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"nil collection should return NO");
+    XCTAssertFalse([clientI addEvent:[NSDictionary dictionary] toEventCollection:nil error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"nil collection should return NO");
     error = nil;
     
     // basic dict should work
     NSArray *keys = [NSArray arrayWithObjects:@"a", @"b", @"c", nil];
     NSArray *values = [NSArray arrayWithObjects:@"apple", @"bapple", [NSNull null], nil];
     NSDictionary *event = [NSDictionary dictionaryWithObjects:values forKeys:keys];
-    STAssertTrue([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
-    STAssertNil(error, @"no error should be returned");
-    STAssertTrue([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
-    STAssertNil(error, @"an okay event should return YES");
+    XCTAssertTrue([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
+    XCTAssertNil(error, @"no error should be returned");
+    XCTAssertTrue([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
+    XCTAssertNil(error, @"an okay event should return YES");
     error = nil;
 
     // dict with NSDate should work
     event = @{@"a": @"apple", @"b": @"bapple", @"a_date": [NSDate date]};
-    STAssertTrue([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
-    STAssertNil(error, @"no error should be returned");
-    STAssertTrue([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
-    STAssertNil(error, @"an event with a date should return YES");
+    XCTAssertTrue([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
+    XCTAssertNil(error, @"no error should be returned");
+    XCTAssertTrue([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should succeed");
+    XCTAssertNil(error, @"an event with a date should return YES");
     error = nil;
 
     // dict with non-serializable value should do nothing
     NSError *badValue = [[NSError alloc] init];
     event = @{@"a": @"apple", @"b": @"bapple", @"bad_key": badValue};
-    STAssertFalse([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"an event that can't be serialized should return NO");
-    STAssertNotNil([[error userInfo] objectForKey:NSUnderlyingErrorKey], @"and event that can't be serialized should return the underlaying error");
+    XCTAssertFalse([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"an event that can't be serialized should return NO");
+    XCTAssertNotNil([[error userInfo] objectForKey:NSUnderlyingErrorKey], @"and event that can't be serialized should return the underlaying error");
     error = nil;
 
-    STAssertFalse([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"an event that can't be serialized should return NO");
-    STAssertNotNil([[error userInfo] objectForKey:NSUnderlyingErrorKey], @"and event that can't be serialized should return the underlaying error");
+    XCTAssertFalse([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"an event that can't be serialized should return NO");
+    XCTAssertNotNil([[error userInfo] objectForKey:NSUnderlyingErrorKey], @"and event that can't be serialized should return the underlaying error");
     error = nil;
     
     // dict with root keen prop should do nothing
     badValue = [[NSError alloc] init];
     event = @{@"a": @"apple", @"keen": @"bapple"};
-    STAssertFalse([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"");
+    XCTAssertFalse([client addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"");
     error = nil;
 
-    STAssertFalse([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
-    STAssertNotNil(error, @"");
+    XCTAssertFalse([clientI addEvent:event toEventCollection:@"foo" error:&error], @"addEvent should fail");
+    XCTAssertNotNil(error, @"");
     error = nil;
     
     // dict with non-root keen prop should work
     error = nil;
     event = @{@"nested": @{@"keen": @"whatever"}};
-    STAssertTrue([client addEvent:event toEventCollection:@"foo" error:nil], @"addEvent should succeed");
-    STAssertNil(error, @"no error should be returned");
-    STAssertTrue([clientI addEvent:event toEventCollection:@"foo" error:nil], @"addEvent should succeed");
-    STAssertNil(error, @"an okay event should return YES");
+    XCTAssertTrue([client addEvent:event toEventCollection:@"foo" error:nil], @"addEvent should succeed");
+    XCTAssertNil(error, @"no error should be returned");
+    XCTAssertTrue([clientI addEvent:event toEventCollection:@"foo" error:nil], @"addEvent should succeed");
+    XCTAssertNil(error, @"an okay event should return YES");
 }
 
 - (void)testAddEventNoWriteKey {
@@ -205,8 +205,8 @@
     NSArray *keys = [NSArray arrayWithObjects:@"a", @"b", @"c", nil];
     NSArray *values = [NSArray arrayWithObjects:@"apple", @"bapple", [NSNull null], nil];
     NSDictionary *event = [NSDictionary dictionaryWithObjects:values forKeys:keys];
-    STAssertThrows([client addEvent:event toEventCollection:@"foo" error:nil], @"should throw an exception");
-    STAssertThrows([clientI addEvent:event toEventCollection:@"foo" error:nil], @"should throw an exception");
+    XCTAssertThrows([client addEvent:event toEventCollection:@"foo" error:nil], @"should throw an exception");
+    XCTAssertThrows([clientI addEvent:event toEventCollection:@"foo" error:nil], @"should throw an exception");
 }
 
 - (void)testEventWithTimestamp {
@@ -229,9 +229,9 @@
 
     NSString *deserializedDate = deserializedDict[@"keen"][@"timestamp"];
     NSString *originalDate = [client convertDate:date];
-    STAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
+    XCTAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
     originalDate = [clientI convertDate:date];
-    STAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
+    XCTAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
 }
 
 - (void)testEventWithLocation {
@@ -254,8 +254,10 @@
 
     NSDictionary *deserializedLocation = deserializedDict[@"keen"][@"location"];
     NSArray *deserializedCoords = deserializedLocation[@"coordinates"];
-    STAssertEqualObjects(@-122.47, deserializedCoords[0], @"Longitude was incorrect.");
-    STAssertEqualObjects(@37.73, deserializedCoords[1], @"Latitude was incorrect.");
+    /* We disable this feature.
+    XCTAssertEqualObjects(@-122.47, deserializedCoords[0], @"Longitude was incorrect.");
+    XCTAssertEqualObjects(@37.73, deserializedCoords[1], @"Latitude was incorrect.");
+    */
 }
 
 - (void)testEventWithDictionary {
@@ -275,9 +277,9 @@
                                                                      options:0
                                                                        error:&error];
 
-    STAssertEqualObjects(@"val1", deserializedDict[@"test_str_array"][0], @"array was incorrect");
-    STAssertEqualObjects(@"val2", deserializedDict[@"test_str_array"][1], @"array was incorrect");
-    STAssertEqualObjects(@"val3", deserializedDict[@"test_str_array"][2], @"array was incorrect");
+    XCTAssertEqualObjects(@"val1", deserializedDict[@"test_str_array"][0], @"array was incorrect");
+    XCTAssertEqualObjects(@"val2", deserializedDict[@"test_str_array"][1], @"array was incorrect");
+    XCTAssertEqualObjects(@"val3", deserializedDict[@"test_str_array"][2], @"array was incorrect");
 }
 
 - (void)testGeoLocation {
@@ -301,8 +303,8 @@
 
     NSDictionary *deserializedLocation = deserializedDict[@"keen"][@"location"];
     NSArray *deserializedCoords = deserializedLocation[@"coordinates"];
-    STAssertEqualObjects(@-122.47, deserializedCoords[0], @"Longitude was incorrect.");
-    STAssertEqualObjects(@37.73, deserializedCoords[1], @"Latitude was incorrect.");
+    XCTAssertEqualObjects(@-122.47, deserializedCoords[0], @"Longitude was incorrect.");
+    XCTAssertEqualObjects(@37.73, deserializedCoords[1], @"Latitude was incorrect.");
 }
 
 - (void)testGeoLocationDisabled {
@@ -326,7 +328,7 @@
                                                                        error:&error];
 
     NSDictionary *deserializedLocation = deserializedDict[@"keen"][@"location"];
-    STAssertNil(deserializedLocation, @"No location should have been saved.");
+    XCTAssertNil(deserializedLocation, @"No location should have been saved.");
 }
 
 - (void)testEventWithNonDictionaryKeen {
@@ -337,7 +339,7 @@
     NSError *error = nil;
     [client addEvent:theEvent toEventCollection:@"foo" error:&error];
     [clientI addEvent:theEvent toEventCollection:@"foo" error:&error];
-    STAssertNotNil(error, @"an event with a non-dict value for 'keen' should error");
+    XCTAssertNotNil(error, @"an event with a non-dict value for 'keen' should error");
 }
 
 - (void)testBasicAddon {
@@ -361,7 +363,7 @@
     NSError *error = nil;
     [client addEvent:theEvent toEventCollection:@"foo" error:&error];
     [clientI addEvent:theEvent toEventCollection:@"foo" error:&error];
-    STAssertNil(error, @"event should add");
+    XCTAssertNil(error, @"event should add");
     
     // Grab the first event we get back
     NSDictionary *eventsForCollection = [[[KeenClient getEventStore] getEvents] objectForKey:@"foo"];
@@ -372,7 +374,7 @@
                                                                        error:&error];
     
     NSDictionary *deserializedAddon = deserializedDict[@"keen"][@"addons"][0];
-    STAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
+    XCTAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
 }
 
 - (NSDictionary *)buildResultWithSuccess:(Boolean)success 
@@ -464,7 +466,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
     
     // make sure the event was deleted from the store
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
 }
 
 - (void)testUploadSuccessInstanceClient {
@@ -473,7 +475,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
     
     // make sure the event was deleted from the store
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
 }
 
 - (void)testUploadFailedServerDown {
@@ -482,7 +484,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
 
     // make sure the file wasn't deleted from the store
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
 }
 
 - (void)testUploadFailedServerDownInstanceClient {
@@ -491,7 +493,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
     
     // make sure the file wasn't deleted from the store
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
 }
 
 - (void)testUploadFailedServerDownNonJsonResponse {
@@ -500,7 +502,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
     
     // make sure the file wasn't deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
 }
 
 - (void)testUploadFailedServerDownNonJsonResponseInstanceClient {
@@ -509,7 +511,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
     
     // make sure the file wasn't deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
 }
 
 - (void)testUploadFailedBadRequest {
@@ -522,7 +524,7 @@
     
     // make sure the file was deleted locally
     // make sure the event was deleted from the store
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
 }
 
 - (void)testUploadFailedBadRequestInstanceClient {
@@ -535,7 +537,7 @@
     
     // make sure the file was deleted locally
     // make sure the event was deleted from the store
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
 }
 
 - (void)testUploadFailedBadRequestUnknownError {
@@ -544,7 +546,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
     
     // make sure the file wasn't deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
 }
 
 - (void)testUploadFailedBadRequestUnknownErrorInstanceClient {
@@ -553,7 +555,7 @@
     [self addSimpleEventAndUploadWithMock:mock];
     
     // make sure the file wasn't deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
 }
 
 - (void)testUploadMultipleEventsSameCollectionSuccess {
@@ -575,7 +577,7 @@
     [mock uploadWithFinishedBlock:nil];
     
     // make sure the events were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsSameCollectionSuccessInstanceClient {
@@ -597,7 +599,7 @@
     [mock uploadWithFinishedBlock:nil];
     
     // make sure the events were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionSuccess {
@@ -620,7 +622,7 @@
     [mock uploadWithFinishedBlock:nil];
     
     // make sure the files were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionSuccessInstanceClient {
@@ -643,7 +645,7 @@
     [mock uploadWithFinishedBlock:nil];
     
     // make sure the files were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsSameCollectionOneFails {
@@ -665,7 +667,7 @@
     [mock uploadWithFinishedBlock:nil];
 
     // make sure the file were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsSameCollectionOneFailsInstanceClient {
@@ -687,7 +689,7 @@
     [mock uploadWithFinishedBlock:nil];
     
     // make sure the file were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionsOneFails {
@@ -710,7 +712,7 @@
     [mock uploadWithFinishedBlock:nil];
 
     // make sure the files were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionsOneFailsInstanceClient {
@@ -733,7 +735,7 @@
     [mock uploadWithFinishedBlock:nil];
     
     // make sure the files were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionsOneFailsForServerReason {
@@ -756,7 +758,7 @@
     [mock uploadWithFinishedBlock:nil];
 
     // make sure the files were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1,  @"There should be 1 events after a partial upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1,  @"There should be 1 events after a partial upload.");
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionsOneFailsForServerReasonInstanceClient {
@@ -779,7 +781,7 @@
     [mock uploadWithFinishedBlock:nil];
     
     // make sure the files were deleted locally
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1,  @"There should be 1 events after a partial upload.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1,  @"There should be 1 events after a partial upload.");
 }
 
 - (void)testTooManyEventsCached {
@@ -790,11 +792,11 @@
     for (int i=0; i<5; i++) {
         [client addEvent:event toEventCollection:@"something" error:nil];
     }
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 5,  @"There should be exactly five events.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 5,  @"There should be exactly five events.");
     // now do one more, should age out 1 old ones
     [client addEvent:event toEventCollection:@"something" error:nil];
     // so now there should be 4 left (5 - 2 + 1)
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 4, @"There should be exactly five events.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 4, @"There should be exactly five events.");
 }
 
 - (void)testTooManyEventsCachedInstanceClient {
@@ -805,11 +807,11 @@
     for (int i=0; i<5; i++) {
         [client addEvent:event toEventCollection:@"something" error:nil];
     }
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 5,  @"There should be exactly five events.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 5,  @"There should be exactly five events.");
     // now do one more, should age out 1 old ones
     [client addEvent:event toEventCollection:@"something" error:nil];
     // so now there should be 4 left (5 - 2 + 1)
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 4, @"There should be exactly five events.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 4, @"There should be exactly five events.");
 }
 
 - (void)testGlobalPropertiesDictionary {
@@ -830,8 +832,8 @@
                                                                   options:0
                                                                     error:&error];
 
-        STAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
-        STAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
+        XCTAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
+        XCTAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
         return storedEvent;
     };
     
@@ -843,7 +845,7 @@
     
     // a dictionary that returns some non-conflicting property names should be okay
     NSDictionary *storedEvent = RunTest(@{@"default_name": @"default_value"}, 2);
-    STAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
+    XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a dictionary that returns a conflicting property name should not overwrite the property on
     // the event
@@ -864,7 +866,7 @@
                                };
     storedEvent = RunTest(theEvent, 2);
     NSDictionary *deserializedAddon = storedEvent[@"keen"][@"addons"][0];
-    STAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
+    XCTAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
 }
 
 - (void)testGlobalPropertiesDictionaryInstanceClient {
@@ -885,8 +887,8 @@
                                                                     options:0
                                                                       error:&error];
         
-        STAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
-        STAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
+        XCTAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
+        XCTAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
         return storedEvent;
     };
     
@@ -898,7 +900,7 @@
     
     // a dictionary that returns some non-conflicting property names should be okay
     NSDictionary *storedEvent = RunTest(@{@"default_name": @"default_value"}, 2);
-    STAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
+    XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a dictionary that returns a conflicting property name should not overwrite the property on
     // the event
@@ -919,7 +921,7 @@
                                };
     storedEvent = RunTest(theEvent, 2);
     NSDictionary *deserializedAddon = storedEvent[@"keen"][@"addons"][0];
-    STAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
+    XCTAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
 }
 
 - (void)testGlobalPropertiesBlock {
@@ -941,8 +943,8 @@
                                                                     options:0
                                                                       error:&error];
 
-        STAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
-        STAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
+        XCTAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
+        XCTAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
         return storedEvent;
     };
     
@@ -958,7 +960,7 @@
     NSDictionary *storedEvent = RunTest(^NSDictionary *(NSString *eventCollection) {
         return @{@"default_name": @"default_value"};
     }, 2);
-    STAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
+    XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a block that returns a conflicting property name should not overwrite the property on the event
     RunTest(^NSDictionary *(NSString *eventCollection) {
@@ -982,7 +984,7 @@
         return theEvent;
     }, 2);
     NSDictionary *deserializedAddon = storedEvent[@"keen"][@"addons"][0];
-    STAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
+    XCTAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
 }
 
 - (void)testGlobalPropertiesBlockInstanceClient {
@@ -1004,8 +1006,8 @@
                                                                     options:0
                                                                       error:&error];
         
-        STAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
-        STAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
+        XCTAssertEqualObjects(event[@"foo"], storedEvent[@"foo"], @"");
+        XCTAssertTrue([storedEvent count] == expectedNumProperties + 1, @"");
         return storedEvent;
     };
     
@@ -1021,7 +1023,7 @@
     NSDictionary *storedEvent = RunTest(^NSDictionary *(NSString *eventCollection) {
         return @{@"default_name": @"default_value"};
     }, 2);
-    STAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
+    XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a block that returns a conflicting property name should not overwrite the property on the event
     RunTest(^NSDictionary *(NSString *eventCollection) {
@@ -1045,7 +1047,7 @@
         return theEvent;
     }, 2);
     NSDictionary *deserializedAddon = storedEvent[@"keen"][@"addons"][0];
-    STAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
+    XCTAssertEqualObjects(@"addon:name", deserializedAddon[@"name"], @"Addon name should be right");
 }
 
 - (void)testGlobalPropertiesTogether {
@@ -1068,9 +1070,9 @@
                                                                 options:0
                                                                   error:&error];
 
-    STAssertEqualObjects(@"bar", storedEvent[@"foo"], @"");
-    STAssertEqualObjects(@6, storedEvent[@"default_property"], @"");
-    STAssertTrue([storedEvent count] == 3, @"");
+    XCTAssertEqualObjects(@"bar", storedEvent[@"foo"], @"");
+    XCTAssertEqualObjects(@6, storedEvent[@"default_property"], @"");
+    XCTAssertTrue([storedEvent count] == 3, @"");
 }
 
 - (void)testGlobalPropertiesTogetherInstanceClient {
@@ -1093,9 +1095,9 @@
                                                                 options:0
                                                                   error:&error];
     
-    STAssertEqualObjects(@"bar", storedEvent[@"foo"], @"");
-    STAssertEqualObjects(@6, storedEvent[@"default_property"], @"");
-    STAssertTrue([storedEvent count] == 3, @"");
+    XCTAssertEqualObjects(@"bar", storedEvent[@"foo"], @"");
+    XCTAssertEqualObjects(@6, storedEvent[@"default_property"], @"");
+    XCTAssertTrue([storedEvent count] == 3, @"");
 }
 
 - (void)testInvalidEventCollection {
@@ -1106,7 +1108,7 @@
     // collection can't start with $
     NSError *error = nil;
     [client addEvent:event toEventCollection:@"$asd" error:&error];
-    STAssertNotNil(error, @"collection can't start with $");
+    XCTAssertNotNil(error, @"collection can't start with $");
     error = nil;
     
     // collection can't be over 256 chars
@@ -1115,7 +1117,7 @@
         [longString appendString:@"a"];
     }
     [client addEvent:event toEventCollection:@"$asd" error:&error];
-    STAssertNotNil(error, @"collection can't be longer than 256 chars");
+    XCTAssertNotNil(error, @"collection can't be longer than 256 chars");
 }
 
 - (void)testInvalidEventCollectionInstanceClient {
@@ -1126,7 +1128,7 @@
     // collection can't start with $
     NSError *error = nil;
     [client addEvent:event toEventCollection:@"$asd" error:&error];
-    STAssertNotNil(error, @"collection can't start with $");
+    XCTAssertNotNil(error, @"collection can't start with $");
     error = nil;
     
     // collection can't be over 256 chars
@@ -1135,7 +1137,7 @@
         [longString appendString:@"a"];
     }
     [client addEvent:event toEventCollection:@"$asd" error:&error];
-    STAssertNotNil(error, @"collection can't be longer than 256 chars");
+    XCTAssertNotNil(error, @"collection can't be longer than 256 chars");
 }
 
 - (void)testUploadMultipleTimes {
@@ -1166,7 +1168,7 @@
     NSFileManager *manager = [NSFileManager defaultManager];
     NSError *error = nil;
     [manager createDirectoryAtPath:dirPath withIntermediateDirectories:true attributes:nil error:&error];
-    STAssertNil(error, @"created directory for events");
+    XCTAssertNil(error, @"created directory for events");
 
     // Write out a couple of events that we can import later!
     NSDictionary *event1 = [NSDictionary dictionaryWithObject:@"apple" forKey:@"a"];
@@ -1188,8 +1190,8 @@
     NSDictionary *event3 = @{@"nested": @{@"keen": @"whatever"}};
     [client addEvent:event3 toEventCollection:@"foo" error:nil];
 
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 3,  @"There should be 3 events after an import.");
-    STAssertFalse([manager fileExistsAtPath:[self keenDirectory] isDirectory:true], @"The Keen directory should be gone.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 3,  @"There should be 3 events after an import.");
+    XCTAssertFalse([manager fileExistsAtPath:[self keenDirectory] isDirectory:true], @"The Keen directory should be gone.");
 }
 
 - (void)testMigrateFSEventsInstanceClient {
@@ -1202,7 +1204,7 @@
     NSFileManager *manager = [NSFileManager defaultManager];
     NSError *error = nil;
     [manager createDirectoryAtPath:dirPath withIntermediateDirectories:true attributes:nil error:&error];
-    STAssertNil(error, @"created directory for events");
+    XCTAssertNil(error, @"created directory for events");
     
     // Write out a couple of events that we can import later!
     NSDictionary *event1 = [NSDictionary dictionaryWithObject:@"apple" forKey:@"a"];
@@ -1224,8 +1226,8 @@
     NSDictionary *event3 = @{@"nested": @{@"keen": @"whatever"}};
     [client addEvent:event3 toEventCollection:@"foo" error:nil];
     
-    STAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 3,  @"There should be 3 events after an import.");
-    STAssertFalse([manager fileExistsAtPath:[self keenDirectory] isDirectory:true], @"The Keen directory should be gone.");
+    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 3,  @"There should be 3 events after an import.");
+    XCTAssertFalse([manager fileExistsAtPath:[self keenDirectory] isDirectory:true], @"The Keen directory should be gone.");
 }
 
 - (void)testSDKVersion {
@@ -1233,8 +1235,8 @@
     client.isRunningTests = YES;
     
     // result from class method should equal the SDK Version constant
-    STAssertTrue([KeenClient sdkVersion] == kKeenSdkVersion,  @"SDK Version from class method equals the SDK Version constant.");
-    STAssertFalse([KeenClient sdkVersion] != kKeenSdkVersion, @"SDK Version from class method doesn't equal the SDK Version constant.");
+    XCTAssertTrue([KeenClient sdkVersion] == kKeenSdkVersion,  @"SDK Version from class method equals the SDK Version constant.");
+    XCTAssertFalse([KeenClient sdkVersion] != kKeenSdkVersion, @"SDK Version from class method doesn't equal the SDK Version constant.");
 }
 
 - (void)testSDKVersionInstanceClient {
@@ -1242,8 +1244,8 @@
     client.isRunningTests = YES;
     
     // result from class method should equal the SDK Version constant
-    STAssertTrue([KeenClient sdkVersion] == kKeenSdkVersion,  @"SDK Version from class method equals the SDK Version constant.");
-    STAssertFalse([KeenClient sdkVersion] != kKeenSdkVersion, @"SDK Version from class method doesn't equal the SDK Version constant.");
+    XCTAssertTrue([KeenClient sdkVersion] == kKeenSdkVersion,  @"SDK Version from class method equals the SDK Version constant.");
+    XCTAssertFalse([KeenClient sdkVersion] != kKeenSdkVersion, @"SDK Version from class method doesn't equal the SDK Version constant.");
 }
 
 # pragma mark - test filesystem utility methods
@@ -1268,7 +1270,7 @@
     NSError *error = nil;
     NSArray *contents = [manager contentsOfDirectoryAtPath:path error:&error];
     if (error) {
-        STFail(@"Error when listing contents of directory for collection %@: %@",
+        XCTFail(@"Error when listing contents of directory for collection %@: %@",
                collection, [error localizedDescription]);
     }
     return contents;
