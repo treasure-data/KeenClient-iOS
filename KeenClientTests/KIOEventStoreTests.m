@@ -64,7 +64,7 @@
 - (void)testDelete{
     KIOEventStore *store = [[KIOEventStore alloc] init];
     store.projectId = @"1234";
-    [store addEvent:[@"I AM AN EVENT" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
+    [store addEvent:[@"{\"comment\":\"I AM AN EVENT\"}" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
     XCTAssertTrue([store getTotalEventCount] == 1, @"1 total event after add");
     XCTAssertTrue([store getPendingEventCount] == 0, @"0 pending events after add");
 
@@ -85,8 +85,8 @@
 - (void)testGetPending{
     KIOEventStore *store = [[KIOEventStore alloc] init];
     store.projectId = @"1234";
-    [store addEvent:[@"I AM AN EVENT" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
-    [store addEvent:[@"I AM AN EVENT ALSO" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
+    [store addEvent:[@"{\"comment\":\"I AM AN EVENT\"}" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
+    [store addEvent:[@"{\"comment\":\"I AM AN EVENT ALSO\"}" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
 
     // Lets get some events out now with the purpose of sending them off.
     NSMutableDictionary *events = [store getEvents];
@@ -130,8 +130,8 @@
 - (void)testResetOfPending{
     KIOEventStore *store = [[KIOEventStore alloc] init];
     store.projectId = @"1234";
-    [store addEvent:[@"I AM AN EVENT" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
-    [store addEvent:[@"I AM AN EVENT ALSO" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
+    [store addEvent:[@"{\"comment\":\"I AM AN EVENT\"}" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
+    [store addEvent:[@"{\"comment\":\"I AM AN EVENT ALSO\"}" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
 
     // Lets get some events out now with the purpose of sending them off.
     [store getEvents];
@@ -145,8 +145,8 @@
     XCTAssertFalse([store hasPendingEvents], @"has NO pending events!");
 
     // Again for good measure
-    [store addEvent:[@"I AM AN EVENT" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
-    [store addEvent:[@"I AM AN EVENT ALSO" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
+    [store addEvent:[@"{\"comment\":\"I AM AN EVENT\"}" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
+    [store addEvent:[@"{\"comment\":\"I AM AN EVENT ALSO\"}" dataUsingEncoding:NSUTF8StringEncoding] collection: @"foo"];
 
     [store getEvents];
 

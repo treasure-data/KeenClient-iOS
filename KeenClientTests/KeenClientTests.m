@@ -254,8 +254,10 @@
 
     NSDictionary *deserializedLocation = deserializedDict[@"keen"][@"location"];
     NSArray *deserializedCoords = deserializedLocation[@"coordinates"];
+    /* We disable this feature.
     XCTAssertEqualObjects(@-122.47, deserializedCoords[0], @"Longitude was incorrect.");
     XCTAssertEqualObjects(@37.73, deserializedCoords[1], @"Latitude was incorrect.");
+    */
 }
 
 - (void)testEventWithDictionary {
