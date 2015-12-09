@@ -376,7 +376,7 @@ static KIOEventStore *eventStore;
     // If it's a relatively recent event, turn off updates to save power
     NSDate* eventDate = newLocation.timestamp;
     NSTimeInterval howRecent = [eventDate timeIntervalSinceNow];
-    if (abs(howRecent) < 15.0) {
+    if ((int)fabs(howRecent) < 15.0) {
         KCLog(@"latitude %+.6f, longitude %+.6f\n",
               newLocation.coordinate.latitude,
               newLocation.coordinate.longitude);
@@ -385,7 +385,7 @@ static KIOEventStore *eventStore;
         [self.locationManager stopUpdatingLocation];
         KCLog(@"Done finding location");
     } else {
-        KCLog(@"Event wasn't recent enough: %+.2d", abs(howRecent));
+        KCLog(@"Event wasn't recent enough: %+.2d", (int)fabs(howRecent));
     }
 }
 
@@ -470,11 +470,15 @@ static KIOEventStore *eventStore;
 
     // don't do anything if the event itself or the event collection name are invalid somehow.
     if (![self validateEventCollection:eventCollection error:anError]) {
-        onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        if (onError) {
+            onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        }
         return NO;
     }
     if (![self validateEvent:event withDepth:0 error:anError]) {
-        onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        if (onError) {
+            onError(ERROR_CODE_INVALID_EVENT, [*anError description]);
+        }
         return NO;
     }
     
@@ -532,7 +536,9 @@ static KIOEventStore *eventStore;
     NSError *error = nil;
     NSData *jsonData = [self serializeEventToJSON:eventToWrite error:&error];
     if (error) {
-        onError(ERROR_CODE_DATA_CONVERSION, [*anError description]);
+        if (onError) {
+            onError(ERROR_CODE_DATA_CONVERSION, [*anError description]);
+        }
         return [self handleError:anError
                 withErrorMessage:[NSString stringWithFormat:@"An error occurred when serializing event to JSON: %@", [error localizedDescription]]
                 underlayingError:error];
@@ -541,11 +547,15 @@ static KIOEventStore *eventStore;
     // write JSON to store
     eventStore.lastErrorMessage = nil;
     if (![eventStore addEvent:jsonData collection: eventCollection]) {
-        onError(ERROR_CODE_STORAGE_ERROR, eventStore.lastErrorMessage);
+        if (onError) {
+            onError(ERROR_CODE_STORAGE_ERROR, eventStore.lastErrorMessage);
+        }
         return NO;
     }
     
-    onSuccess();
+    if (onSuccess) {
+        onSuccess();
+    }
     // log the event
     if ([KeenClient isLoggingEnabled]) {
         KCLog(@"Event: %@", eventToWrite);
