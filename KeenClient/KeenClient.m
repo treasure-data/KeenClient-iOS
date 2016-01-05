@@ -1060,7 +1060,7 @@ static KIOEventStore *eventStore;
     if (!onError)
         onError = ^(NSString* errorCode, NSString* message){};
 
-    NSError *error = [[NSError alloc] init];
+    NSError *error = nil;
 
     [self addEvent:event withKeenProperties:nil toEventCollection:eventCollection error:&error onSuccess:onSuccess onError:onError];
 }
