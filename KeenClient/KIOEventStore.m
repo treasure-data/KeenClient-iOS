@@ -526,6 +526,11 @@ static NSString *encKey = nil;
 }
 
 - (id)convertNSDateToISO8601:(id)date {
+    if (!dbIsOpen) {
+        KCLog(@"DB is closed, skipping convertNSDateToISO8601");
+        return @"";
+    }
+
     double offset = 0.0f;
     if([date isKindOfClass:[NSDate class]]) {
         offset = [[NSTimeZone localTimeZone] secondsFromGMTForDate:date] / 3600.00;  // need the offset
