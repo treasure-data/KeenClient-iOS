@@ -27,6 +27,8 @@ static NSString *encKey = nil;
 @implementation KIOEventStore {
     keen_io_sqlite3 *keen_dbname;
     BOOL dbIsOpen;
+    BOOL dbIsTableCreated;
+    BOOL dbIsStmtPrepared;
     keen_io_sqlite3_stmt *insert_stmt;
     keen_io_sqlite3_stmt *find_stmt;
     keen_io_sqlite3_stmt *count_all_stmt;
@@ -44,6 +46,8 @@ static NSString *encKey = nil;
     
     if(self) {
         dbIsOpen = NO;
+        dbIsTableCreated = NO;
+        dbIsStmtPrepared = NO;
         [self openAndInitDB];
     }
     return self;
@@ -51,19 +55,26 @@ static NSString *encKey = nil;
 
 
 - (BOOL)openAndInitDB {
-    if(!dbIsOpen) {
+    if (!dbIsOpen) {
         if (![self openDB]) {
             return false;
-        } else {
-            if(![self createTable]) {
-                KCLog(@"Failed to create SQLite table!");
-                [self closeDB];
-                return false;
-            }
-            
-            return [self prepareAllSQLiteStatements];
         }
     }
+    
+    if (!dbIsTableCreated) {
+        if(![self createTable]) {
+            KCLog(@"Failed to create SQLite table!");
+            return false;
+        }
+    }
+    
+    if (!dbIsStmtPrepared) {
+        if (![self prepareAllSQLiteStatements]) {
+            KCLog(@"Failed to prepare statements!");
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -146,6 +157,8 @@ static NSString *encKey = nil;
         [self handleSQLiteFailure:@"prepare convert date statement"];
         return FALSE;
     }
+    
+    dbIsStmtPrepared = TRUE;
     return TRUE;
 }
 
@@ -495,11 +508,6 @@ static NSString *encKey = nil;
 
 - (BOOL)createTable {
     __block BOOL wasCreated = NO;
-
-    if (![self openAndInitDB]) {
-        KCLog(@"DB is closed, skipping createTable");
-        return wasCreated;
-    }
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
     dispatch_sync(self.dbQueue, ^{
@@ -512,6 +520,7 @@ static NSString *encKey = nil;
         } else {
             wasCreated = YES;
         }
+        dbIsTableCreated = wasCreated;
     });
 
 
@@ -668,9 +677,7 @@ static NSString *encKey = nil;
 - (void)handleSQLiteFailure: (NSString *) msg {
     NSLog(@"Failed to %@: %@",
           msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]);
-    if (dbIsOpen) {
-        [self closeDB];
-    }
+
     self.lastErrorMessage = [NSString stringWithFormat:@"Failed to %@: %@",
                              msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]];
 }
