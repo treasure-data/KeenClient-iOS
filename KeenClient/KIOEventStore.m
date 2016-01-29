@@ -17,7 +17,11 @@
 static NSString *encKey = nil;
 
 @interface KIOEventStore()
+- (BOOL)openAndInitDB;
 - (void)closeDB;
+- (void)releaseStatements;
+- (BOOL)isDatabaseFileAccessible;
+- (NSString*)getDatabaseFilePath;
 
 // A dispatch queue used for sqlite.
 @property (nonatomic) dispatch_queue_t dbQueue;
@@ -45,6 +49,9 @@ static NSString *encKey = nil;
     self = [super init];
     
     if(self) {
+        // we're going to use a queue for all database operations, so let's create it
+        self.dbQueue = dispatch_queue_create("io.keen.sqlite", DISPATCH_QUEUE_SERIAL);
+        
         dbIsOpen = NO;
         dbIsTableCreated = NO;
         dbIsStmtPrepared = NO;
@@ -56,6 +63,11 @@ static NSString *encKey = nil;
 
 - (BOOL)openAndInitDB {
     if (!dbIsOpen) {
+        if (![self isDatabaseFileAccessible]) {
+            KCLog(@"Database file isn't accessible now");
+            return false;
+        }
+        
         if (![self openDB]) {
             return false;
         }
@@ -480,13 +492,32 @@ static NSString *encKey = nil;
     });
 }
 
-- (BOOL)openDB {
-    __block BOOL wasOpened = NO;
+- (BOOL)isDatabaseFileAccessible {
+    NSString *my_sqlfile = [self getDatabaseFilePath];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if ([fileManager fileExistsAtPath:my_sqlfile]) {
+        // Check if the existing database file is accessible since I/O to the file fails after Data Protection enabled
+        FILE *f = fopen([my_sqlfile UTF8String], "r");
+        if (f == NULL) {
+            NSLog(@"Failed to open database file!");
+            return FALSE;
+        }
+        fclose(f);
+    }
+    
+    // Maybe it'd better check if it's possible to create database file here
+    return TRUE;
+}
+
+- (NSString*)getDatabaseFilePath {
     NSString *libraryPath = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) objectAtIndex:0];
     NSString *my_sqlfile = [libraryPath stringByAppendingPathComponent:@"keenEvents.sqlite"];
-    
-    // we're going to use a queue for all database operations, so let's create it
-    self.dbQueue = dispatch_queue_create("io.keen.sqlite", DISPATCH_QUEUE_SERIAL);
+    return my_sqlfile;
+}
+
+- (BOOL)openDB {
+    __block BOOL wasOpened = NO;
+    NSString *my_sqlfile = [self getDatabaseFilePath];
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
     dispatch_sync(self.dbQueue, ^{
@@ -528,6 +559,13 @@ static NSString *encKey = nil;
 }
 
 - (void)closeDB {
+    // Free our DB. This is safe on null pointers.
+    keen_io_sqlite3_close(keen_dbname);
+    // Reset state in case it matters.
+    dbIsOpen = NO;
+}
+
+- (void)releaseStatements {
     // Free all the prepared statements. This is safe on null pointers.
     keen_io_sqlite3_finalize(insert_stmt);
     keen_io_sqlite3_finalize(find_stmt);
@@ -540,11 +578,7 @@ static NSString *encKey = nil;
     keen_io_sqlite3_finalize(delete_all_stmt);
     keen_io_sqlite3_finalize(age_out_stmt);
     keen_io_sqlite3_finalize(convert_date_stmt);
-    
-    // Free our DB. This is safe on null pointers.
-    keen_io_sqlite3_close(keen_dbname);
-    // Reset state in case it matters.
-    dbIsOpen = NO;
+    dbIsStmtPrepared = NO;
 }
 
 - (id)convertNSDateToISO8601:(id)date {
@@ -678,6 +712,14 @@ static NSString *encKey = nil;
     NSLog(@"Failed to %@: %@",
           msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]);
 
+    if (dbIsStmtPrepared) {
+        [self releaseStatements];
+    }
+    
+    if (dbIsOpen) {
+        [self closeDB];
+    }
+    
     self.lastErrorMessage = [NSString stringWithFormat:@"Failed to %@: %@",
                              msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]];
 }
