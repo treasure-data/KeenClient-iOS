@@ -17,7 +17,11 @@
 static NSString *encKey = nil;
 
 @interface KIOEventStore()
+- (BOOL)openAndInitDB;
 - (void)closeDB;
+- (void)releaseStatements;
+- (BOOL)isDatabaseFileAccessible;
+- (NSString*)getDatabaseFilePath;
 
 // A dispatch queue used for sqlite.
 @property (nonatomic) dispatch_queue_t dbQueue;
@@ -27,6 +31,8 @@ static NSString *encKey = nil;
 @implementation KIOEventStore {
     keen_io_sqlite3 *keen_dbname;
     BOOL dbIsOpen;
+    BOOL dbIsTableCreated;
+    BOOL dbIsStmtPrepared;
     keen_io_sqlite3_stmt *insert_stmt;
     keen_io_sqlite3_stmt *find_stmt;
     keen_io_sqlite3_stmt *count_all_stmt;
@@ -39,100 +45,143 @@ static NSString *encKey = nil;
     keen_io_sqlite3_stmt *age_out_stmt;
     keen_io_sqlite3_stmt *convert_date_stmt;
 }
-
 - (instancetype)init {
     self = [super init];
-
+    
     if(self) {
+        // we're going to use a queue for all database operations, so let's create it
+        self.dbQueue = dispatch_queue_create("io.keen.sqlite", DISPATCH_QUEUE_SERIAL);
+        
         dbIsOpen = NO;
-        // First, let's open the database.
-        if ([self openDB]) {
-            // Then try and create the table.
-            if(![self createTable]) {
-                KCLog(@"Failed to create SQLite table!");
-                [self closeDB];
-            }
-
-            // Now we'll init prepared statements for all the things we might do.
-
-            // This statement inserts events into the table.
-            char *insert_sql = "INSERT INTO events (projectId, collection, eventData, pending) VALUES (?, ?, ?, 0)";
-            if (keen_io_sqlite3_prepare_v2(keen_dbname, insert_sql, -1, &insert_stmt, NULL) != SQLITE_OK) {
-                [self handleSQLiteFailure:@"prepare insert statement"];
-                [self closeDB];
-            }
-            
-            // This statement finds non-pending events in the table.
-            char *find_sql = "SELECT id, collection, eventData FROM events WHERE pending=0 AND projectId=?";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, find_sql, -1, &find_stmt, NULL) != SQLITE_OK) {
-                [self handleSQLiteFailure:@"prepare find statement"];
-                [self closeDB];
-            }
-
-            // This statement counts the total number of events (pending or not)
-            char *count_all_sql = "SELECT count(*) FROM events WHERE projectId=?";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, count_all_sql, -1, &count_all_stmt, NULL) != SQLITE_OK) {
-                [self handleSQLiteFailure:@"prepare count all statement"];
-                [self closeDB];
-            }
-
-            // This statement counts the number of pending events.
-            char *count_pending_sql = "SELECT count(*) FROM events WHERE pending=1 AND projectId=?";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, count_pending_sql, -1, &count_pending_stmt, NULL) != SQLITE_OK) {
-                [self handleSQLiteFailure:@"prepare count pending statement"];
-                [self closeDB];
-            }
-
-            // This statement marks an event as pending.
-            char *make_pending_sql = "UPDATE events SET pending=1 WHERE id=?";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, make_pending_sql, -1, &make_pending_stmt, NULL) != SQLITE_OK) {
-                [self handleSQLiteFailure:@"prepare pending statement"];
-                [self closeDB];
-            }
-            
-            // This statement resets pending events back to normal.
-            char *reset_pending_sql = "UPDATE events SET pending=0 WHERE projectId=?";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, reset_pending_sql, -1, &reset_pending_stmt, NULL) != SQLITE_OK) {
-                [self handleSQLiteFailure:@"reset pending statement"];
-                [self closeDB];
-            }
-
-            // This statement purges all pending events.
-            char *purge_sql = "DELETE FROM events WHERE pending=1 AND projectId=?";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, purge_sql, -1, &purge_stmt, NULL) != SQLITE_OK) {
-                [self closeDB];
-            }
-
-            // This statement deletes a specific event.
-            char *delete_sql = "DELETE FROM events WHERE id=?";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, delete_sql, -1, &delete_stmt, NULL) != SQLITE_OK) {
-                [self closeDB];
-            }
-
-            // This statement deletes all events.
-            char *delete_all_sql = "DELETE FROM events";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, delete_all_sql, -1, &delete_all_stmt, NULL) != SQLITE_OK) {
-                [self closeDB];
-            }
-
-            // This statement deletes old events at a given offset.
-            char *age_out_sql = "DELETE FROM events WHERE id <= (SELECT id FROM events ORDER BY id DESC LIMIT 1 OFFSET ?)";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, age_out_sql, -1, &age_out_stmt, NULL) != SQLITE_OK) {
-                [self closeDB];
-            }
-            
-            // This statement converts an NSDate to an ISO-8601 formatted date/time string (we use sqlite because NSDateFormatter isn't thread-safe)
-            char *convert_date_sql = "SELECT strftime('%Y-%m-%dT%H:%M:%S',datetime(?,'unixepoch','localtime'))";
-            if(keen_io_sqlite3_prepare_v2(keen_dbname, convert_date_sql, -1, &convert_date_stmt, NULL) != SQLITE_OK) {
-                [self closeDB];
-            }
-        }
+        dbIsTableCreated = NO;
+        dbIsStmtPrepared = NO;
+        [self openAndInitDB];
     }
     return self;
 }
 
+
+- (BOOL)openAndInitDB {
+    if (!dbIsOpen) {
+        if (![self isDatabaseFileAccessible]) {
+            KCLog(@"Database file isn't accessible now");
+            return false;
+        }
+        
+        if (![self openDB]) {
+            return false;
+        }
+    }
+    
+    if (!dbIsTableCreated) {
+        if(![self createTable]) {
+            KCLog(@"Failed to create SQLite table!");
+            return false;
+        }
+    }
+    
+    if (!dbIsStmtPrepared) {
+        if (![self prepareAllSQLiteStatements]) {
+            KCLog(@"Failed to prepare statements!");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+- (BOOL)prepareAllSQLiteStatements {
+    // Now we'll init prepared statements for all the things we might do.
+
+    // This statement inserts events into the table.
+    char *insert_sql = "INSERT INTO events (projectId, collection, eventData, pending) VALUES (?, ?, ?, 0)";
+    if (keen_io_sqlite3_prepare_v2(keen_dbname, insert_sql, -1, &insert_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare insert statement"];
+        return FALSE;
+    }
+    
+    // This statement finds non-pending events in the table.
+    char *find_sql = "SELECT id, collection, eventData FROM events WHERE pending=0 AND projectId=?";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, find_sql, -1, &find_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare find statement"];
+        return FALSE;
+    }
+
+    // This statement counts the total number of events (pending or not)
+    char *count_all_sql = "SELECT count(*) FROM events WHERE projectId=?";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, count_all_sql, -1, &count_all_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare count all statement"];
+        return FALSE;
+    }
+
+    // This statement counts the number of pending events.
+    char *count_pending_sql = "SELECT count(*) FROM events WHERE pending=1 AND projectId=?";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, count_pending_sql, -1, &count_pending_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare count pending statement"];
+        return FALSE;
+    }
+
+    // This statement marks an event as pending.
+    char *make_pending_sql = "UPDATE events SET pending=1 WHERE id=?";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, make_pending_sql, -1, &make_pending_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare pending statement"];
+        return FALSE;
+    }
+    
+    // This statement resets pending events back to normal.
+    char *reset_pending_sql = "UPDATE events SET pending=0 WHERE projectId=?";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, reset_pending_sql, -1, &reset_pending_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare reset pending statement"];
+        return FALSE;
+    }
+
+    // This statement purges all pending events.
+    char *purge_sql = "DELETE FROM events WHERE pending=1 AND projectId=?";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, purge_sql, -1, &purge_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare purge statement"];
+        return FALSE;
+    }
+
+    // This statement deletes a specific event.
+    char *delete_sql = "DELETE FROM events WHERE id=?";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, delete_sql, -1, &delete_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare delete statement"];
+        return FALSE;
+    }
+
+    // This statement deletes all events.
+    char *delete_all_sql = "DELETE FROM events";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, delete_all_sql, -1, &delete_all_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare delete all statement"];
+        return FALSE;
+    }
+
+    // This statement deletes old events at a given offset.
+    char *age_out_sql = "DELETE FROM events WHERE id <= (SELECT id FROM events ORDER BY id DESC LIMIT 1 OFFSET ?)";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, age_out_sql, -1, &age_out_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare age out statement"];
+        return FALSE;
+    }
+    
+    // This statement converts an NSDate to an ISO-8601 formatted date/time string (we use sqlite because NSDateFormatter isn't thread-safe)
+    char *convert_date_sql = "SELECT strftime('%Y-%m-%dT%H:%M:%S',datetime(?,'unixepoch','localtime'))";
+    if(keen_io_sqlite3_prepare_v2(keen_dbname, convert_date_sql, -1, &convert_date_stmt, NULL) != SQLITE_OK) {
+        [self handleSQLiteFailure:@"prepare convert date statement"];
+        return FALSE;
+    }
+    
+    dbIsStmtPrepared = TRUE;
+    return TRUE;
+}
+
 - (BOOL)addEvent:(NSData *)eventData collection: (NSString *)coll {
     __block BOOL wasAdded = NO;
+
+    if (![self openAndInitDB]) {
+        KCLog(@"DB is closed, skipping addEvent");
+        return wasAdded;
+    }
+    
     if (encKey) {
         NSString *encryptedBase64 = [self encrypt:eventData];
         if (encryptedBase64) {
@@ -144,11 +193,6 @@ static NSString *encKey = nil;
         }
     }
 
-    if (!dbIsOpen) {
-        KCLog(@"DB is closed, skipping addEvent");
-        return wasAdded;
-    }
-    
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
     dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(insert_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
@@ -187,7 +231,7 @@ static NSString *encKey = nil;
     // Create a dictionary to hold the contents of our select.
     __block NSMutableDictionary *events = [NSMutableDictionary dictionary];
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping getEvents");
         // Return an empty array so we don't break anything. No nulls here!
         return events;
@@ -202,6 +246,7 @@ static NSString *encKey = nil;
     dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(find_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to find statement"];
+            return;
         }
 
         while (keen_io_sqlite3_step(find_stmt) == SQLITE_ROW) {
@@ -218,9 +263,11 @@ static NSString *encKey = nil;
             // Bind and mark the event pending.
             if(keen_io_sqlite3_bind_int64(make_pending_stmt, 1, eventId) != SQLITE_OK) {
                 [self handleSQLiteFailure:@"bind int for make pending"];
+                return;
             }
             if (keen_io_sqlite3_step(make_pending_stmt) != SQLITE_DONE) {
                 [self handleSQLiteFailure:@"mark event pending"];
+                return;
             }
 
             // Reset the pendifier
@@ -276,7 +323,7 @@ static NSString *encKey = nil;
 
 - (void)resetPendingEvents{
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping resetPendingEvents");
         return;
     }
@@ -284,9 +331,11 @@ static NSString *encKey = nil;
     dispatch_async(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(reset_pending_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to reset pending statement"];
+            return;
         }
         if (keen_io_sqlite3_step(reset_pending_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"reset pending events"];
+            return;
         }
         keen_io_sqlite3_reset(reset_pending_stmt);
         keen_io_sqlite3_clear_bindings(reset_pending_stmt);
@@ -310,7 +359,7 @@ static NSString *encKey = nil;
 - (NSUInteger)getPendingEventCount {
     __block NSUInteger eventCount = 0;
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping getPendingEventcount");
         return eventCount;
     }
@@ -319,11 +368,13 @@ static NSString *encKey = nil;
     dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(count_pending_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to count pending statement"];
+            return;
         }
         if (keen_io_sqlite3_step(count_pending_stmt) == SQLITE_ROW) {
             eventCount = (NSInteger) keen_io_sqlite3_column_int(count_pending_stmt, 0);
         } else {
             [self handleSQLiteFailure:@"get count of pending rows"];
+            return;
         }
         keen_io_sqlite3_reset(count_pending_stmt);
         keen_io_sqlite3_clear_bindings(count_pending_stmt);
@@ -335,7 +386,7 @@ static NSString *encKey = nil;
 - (NSUInteger)getTotalEventCount {
     __block NSUInteger eventCount = 0;
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping getTotalEventCount");
         return eventCount;
     }
@@ -344,11 +395,13 @@ static NSString *encKey = nil;
     dispatch_sync(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(count_all_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to total event statement"];
+            return;
         }
         if (keen_io_sqlite3_step(count_all_stmt) == SQLITE_ROW) {
             eventCount = (NSInteger) keen_io_sqlite3_column_int(count_all_stmt, 0);
         } else {
             [self handleSQLiteFailure:@"get count of total rows"];
+            return;
         }
         keen_io_sqlite3_reset(count_all_stmt);
         keen_io_sqlite3_clear_bindings(count_all_stmt);
@@ -359,7 +412,7 @@ static NSString *encKey = nil;
 
 - (void)deleteEvent: (NSNumber *)eventId {
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping deleteEvent");
         return;
     }
@@ -367,9 +420,11 @@ static NSString *encKey = nil;
     dispatch_async(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_int64(delete_stmt, 1, [eventId unsignedLongLongValue]) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind eventid to delete statement"];
+            return;
         }
         if (keen_io_sqlite3_step(delete_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"delete event"];
+            return;
         };
         keen_io_sqlite3_reset(delete_stmt);
         keen_io_sqlite3_clear_bindings(delete_stmt);
@@ -378,7 +433,7 @@ static NSString *encKey = nil;
 
 - (void)deleteAllEvents {
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping deleteEvent");
         return;
     }
@@ -386,6 +441,7 @@ static NSString *encKey = nil;
     dispatch_async(self.dbQueue, ^{
         if (keen_io_sqlite3_step(delete_all_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"delete all events"];
+            return;
         };
         keen_io_sqlite3_reset(delete_all_stmt);
         keen_io_sqlite3_clear_bindings(delete_all_stmt);
@@ -394,7 +450,7 @@ static NSString *encKey = nil;
 
 - (void)deleteEventsFromOffset: (NSNumber *)offset {
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping deleteEvent");
         return;
     }
@@ -402,9 +458,11 @@ static NSString *encKey = nil;
     dispatch_async(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_int64(age_out_stmt, 1, [offset unsignedLongLongValue]) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind offset to ageOut statement"];
+            return;
         }
         if (keen_io_sqlite3_step(age_out_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"delete all events"];
+            return;
         };
         keen_io_sqlite3_reset(age_out_stmt);
         keen_io_sqlite3_clear_bindings(age_out_stmt);
@@ -414,7 +472,7 @@ static NSString *encKey = nil;
 
 - (void)purgePendingEvents {
 
-    if (!dbIsOpen) {
+    if (![self openAndInitDB]) {
         KCLog(@"DB is closed, skipping purgePendingEvents");
         return;
     }
@@ -422,23 +480,44 @@ static NSString *encKey = nil;
     dispatch_async(self.dbQueue, ^{
         if (keen_io_sqlite3_bind_text(purge_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to purge statement"];
+            return;
         }
         if (keen_io_sqlite3_step(purge_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"purge pending events"];
             // XXX What to do here?
+            return;
         };
         keen_io_sqlite3_reset(purge_stmt);
         keen_io_sqlite3_clear_bindings(purge_stmt);
     });
 }
 
-- (BOOL)openDB {
-    __block BOOL wasOpened = NO;
+- (BOOL)isDatabaseFileAccessible {
+    NSString *my_sqlfile = [self getDatabaseFilePath];
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    if ([fileManager fileExistsAtPath:my_sqlfile]) {
+        // Check if the existing database file is accessible since I/O to the file fails after Data Protection enabled
+        FILE *f = fopen([my_sqlfile UTF8String], "r");
+        if (f == NULL) {
+            NSLog(@"Failed to open database file!");
+            return FALSE;
+        }
+        fclose(f);
+    }
+    
+    // Maybe it'd better check if it's possible to create database file here
+    return TRUE;
+}
+
+- (NSString*)getDatabaseFilePath {
     NSString *libraryPath = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) objectAtIndex:0];
     NSString *my_sqlfile = [libraryPath stringByAppendingPathComponent:@"keenEvents.sqlite"];
-    
-    // we're going to use a queue for all database operations, so let's create it
-    self.dbQueue = dispatch_queue_create("io.keen.sqlite", DISPATCH_QUEUE_SERIAL);
+    return my_sqlfile;
+}
+
+- (BOOL)openDB {
+    __block BOOL wasOpened = NO;
+    NSString *my_sqlfile = [self getDatabaseFilePath];
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
     dispatch_sync(self.dbQueue, ^{
@@ -460,11 +539,6 @@ static NSString *encKey = nil;
 
 - (BOOL)createTable {
     __block BOOL wasCreated = NO;
-
-    if (!dbIsOpen) {
-        KCLog(@"DB is closed, skipping createTable");
-        return wasCreated;
-    }
     
     // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
     dispatch_sync(self.dbQueue, ^{
@@ -477,6 +551,7 @@ static NSString *encKey = nil;
         } else {
             wasCreated = YES;
         }
+        dbIsTableCreated = wasCreated;
     });
 
 
@@ -484,6 +559,13 @@ static NSString *encKey = nil;
 }
 
 - (void)closeDB {
+    // Free our DB. This is safe on null pointers.
+    keen_io_sqlite3_close(keen_dbname);
+    // Reset state in case it matters.
+    dbIsOpen = NO;
+}
+
+- (void)releaseStatements {
     // Free all the prepared statements. This is safe on null pointers.
     keen_io_sqlite3_finalize(insert_stmt);
     keen_io_sqlite3_finalize(find_stmt);
@@ -496,14 +578,15 @@ static NSString *encKey = nil;
     keen_io_sqlite3_finalize(delete_all_stmt);
     keen_io_sqlite3_finalize(age_out_stmt);
     keen_io_sqlite3_finalize(convert_date_stmt);
-    
-    // Free our DB. This is safe on null pointers.
-    keen_io_sqlite3_close(keen_dbname);
-    // Reset state in case it matters.
-    dbIsOpen = NO;
+    dbIsStmtPrepared = NO;
 }
 
 - (id)convertNSDateToISO8601:(id)date {
+    if (![self openAndInitDB]) {
+        KCLog(@"DB is closed, skipping convertNSDateToISO8601");
+        return @"";
+    }
+
     double offset = 0.0f;
     if([date isKindOfClass:[NSDate class]]) {
         offset = [[NSTimeZone localTimeZone] secondsFromGMTForDate:date] / 3600.00;  // need the offset
@@ -628,7 +711,15 @@ static NSString *encKey = nil;
 - (void)handleSQLiteFailure: (NSString *) msg {
     NSLog(@"Failed to %@: %@",
           msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]);
-    [self closeDB];
+
+    if (dbIsStmtPrepared) {
+        [self releaseStatements];
+    }
+    
+    if (dbIsOpen) {
+        [self closeDB];
+    }
+    
     self.lastErrorMessage = [NSString stringWithFormat:@"Failed to %@: %@",
                              msg, [NSString stringWithCString:keen_io_sqlite3_errmsg(keen_dbname) encoding:NSUTF8StringEncoding]];
 }
