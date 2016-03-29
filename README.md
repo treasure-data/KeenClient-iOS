@@ -361,7 +361,7 @@ However, the next time they trigger the code that send events (e.g. backgroundin
 
 ##### 3.2.12
 
-+ Skipped 3.2.11 versioning in favor of 3.2.12 to workaround Cocoapods versioning issue.
++ Skipped 3.2.11 versioning in favor of 3.2.12 to workaround CocoaPods versioning issue.
 + Converted KeenClient to use ARC.
 + Renamed all SQLite files with keen\_io\_ prefix.
 + Moved keen\_io\_sqlite3.h import to KIOEventStore.m.
