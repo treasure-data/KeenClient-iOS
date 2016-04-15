@@ -50,7 +50,7 @@ static NSString *encKey = nil;
     
     if(self) {
         // we're going to use a queue for all database operations, so let's create it
-        self.dbQueue = dispatch_queue_create("io.keen.sqlite", DISPATCH_QUEUE_SERIAL);
+        self.dbQueue = dispatch_queue_create("com.treasuredata.sqlite", DISPATCH_QUEUE_SERIAL);
         
         dbIsOpen = NO;
         dbIsTableCreated = NO;
