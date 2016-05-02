@@ -13,9 +13,6 @@
 
 
 static KeenClient *sharedClient;
-static BOOL authorizedGeoLocationAlways = NO;
-static BOOL authorizedGeoLocationWhenInUse = NO;
-static BOOL geoLocationEnabled = NO;
 static BOOL loggingEnabled = NO;
 static KIOEventStore *eventStore;
 
@@ -179,7 +176,6 @@ static KIOEventStore *eventStore;
     }
 
     [KeenClient disableLogging];
-    [KeenClient enableGeoLocation];
 }
 
 + (void)disableLogging {
@@ -192,26 +188,6 @@ static KIOEventStore *eventStore;
 
 + (Boolean)isLoggingEnabled {
     return loggingEnabled;
-}
-
-+ (void)authorizeGeoLocationAlways {
-    KCLog(@"Authorizing Geo Location Always");
-    authorizedGeoLocationAlways = YES;
-}
-
-+ (void)authorizeGeoLocationWhenInUse {
-    KCLog(@"Authorizing Geo Location When In Use");
-    authorizedGeoLocationWhenInUse = YES;
-}
-
-+ (void)enableGeoLocation {
-    KCLog(@"Enabling Geo Location");
-    geoLocationEnabled = YES;
-}
-
-+ (void)disableGeoLocation {
-    KCLog(@"Disabling Geo Location");
-    geoLocationEnabled = NO;
 }
 
 + (void)clearAllEvents {
@@ -229,9 +205,7 @@ static KIOEventStore *eventStore;
     if ([KeenClient isLoggingEnabled]) {
         KCLog(@"KeenClient-iOS %@", kKeenSdkVersion);
     }
-    
-    [self refreshCurrentLocation];
-    
+        
     self.uploadQueue = dispatch_queue_create("io.keen.uploader", DISPATCH_QUEUE_SERIAL);
 
     return self;
@@ -324,69 +298,6 @@ static KIOEventStore *eventStore;
         return nil;
     }
     return sharedClient;
-}
-
-# pragma mark - Geo stuff
-
-- (void)refreshCurrentLocation {
-    // only do this if geo is enabled
-    if (geoLocationEnabled == YES) {
-        KCLog(@"Geo Location is enabled.");
-        // set up the location manager
-        if (self.locationManager == nil) {
-            if ([CLLocationManager locationServicesEnabled]) {
-                self.locationManager = [[CLLocationManager alloc] init];
-                self.locationManager.delegate = self;
-            }
-        }
-        
-        // check for iOS 8 and provide appropriate authorization for location services
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 80000
-        if(self.locationManager != nil) {
-            if([self.locationManager respondsToSelector:@selector(requestAlwaysAuthorization)]) {
-                // allow explicit control over the type of authorization
-                if(authorizedGeoLocationAlways) {
-                    [self.locationManager requestAlwaysAuthorization];
-                }
-                else if(authorizedGeoLocationWhenInUse) {
-                    [self.locationManager requestWhenInUseAuthorization];
-                }
-                else if(!authorizedGeoLocationAlways && !authorizedGeoLocationWhenInUse) {
-                    // default to when in use because it is the least invasive authorization
-                    [self.locationManager requestWhenInUseAuthorization];
-                }
-            }
-        }
-#endif
-        
-        // if, at this point, the location manager is ready to go, we can start location services
-        if (self.locationManager) {
-            [self.locationManager startUpdatingLocation];
-            KCLog(@"Started location manager.");
-        }
-    } else {
-        KCLog(@"Geo Location is disabled.");
-    }
-}
-
-// Delegate method from the CLLocationManagerDelegate protocol.
-- (void)locationManager:(CLLocationManager *)manager
-    didUpdateToLocation:(CLLocation *)newLocation
-           fromLocation:(CLLocation *)oldLocation {
-    // If it's a relatively recent event, turn off updates to save power
-    NSDate* eventDate = newLocation.timestamp;
-    NSTimeInterval howRecent = [eventDate timeIntervalSinceNow];
-    if ((int)fabs(howRecent) < 15.0) {
-        KCLog(@"latitude %+.6f, longitude %+.6f\n",
-              newLocation.coordinate.latitude,
-              newLocation.coordinate.longitude);
-        self.currentLocation = newLocation;
-        // got the location, now stop checking
-        [self.locationManager stopUpdatingLocation];
-        KCLog(@"Done finding location");
-    } else {
-        KCLog(@"Event wasn't recent enough: %+.2d", (int)fabs(howRecent));
-    }
 }
 
 # pragma mark - Add events
@@ -512,9 +423,6 @@ static KIOEventStore *eventStore;
     if (!keenProperties) {
         KeenProperties *newProperties = [[KeenProperties alloc] init];
         keenProperties = newProperties;
-    }
-    if (geoLocationEnabled && self.currentLocation != nil && keenProperties.location == nil) {
-        keenProperties.location = self.currentLocation;
     }
     
     // this is the event we'll actually write
