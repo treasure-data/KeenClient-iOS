@@ -203,10 +203,10 @@ static KIOEventStore *eventStore;
     
     // log the current version number
     if ([KeenClient isLoggingEnabled]) {
-        KCLog(@"KeenClient-iOS %@", kKeenSdkVersion);
+        KCLog(@"KeenClientTD %@", kKeenSdkVersion);
     }
         
-    self.uploadQueue = dispatch_queue_create("io.keen.uploader", DISPATCH_QUEUE_SERIAL);
+    self.uploadQueue = dispatch_queue_create("com.treasuredata.uploader", DISPATCH_QUEUE_SERIAL);
 
     return self;
 }
