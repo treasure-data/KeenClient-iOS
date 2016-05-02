@@ -851,20 +851,8 @@ static KIOEventStore *eventStore;
 # pragma mark - HTTP request/response management
 
 - (NSData *)sendEvents:(NSData *)data returningResponse:(NSURLResponse **)response error:(NSError **)error {
-    NSString *urlString = [NSString stringWithFormat:@"%@/%@/projects/%@/events",
-                           kKeenServerAddress, kKeenApiVersion, self.projectId];
-    KCLog(@"Sending request to: %@", urlString);
-    NSURL *url = [NSURL URLWithString:urlString];
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url cachePolicy:NSURLRequestUseProtocolCachePolicy timeoutInterval:30.0f];
-    [request setHTTPMethod:@"POST"];
-    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [request setValue:self.writeKey forHTTPHeaderField:@"Authorization"];
-    // TODO check if setHTTPBody also sets content-length
-    [request setValue:[NSString stringWithFormat:@"%lud",(unsigned long) [data length]] forHTTPHeaderField:@"Content-Length"];
-    [request setHTTPBody:data];
-    NSData *responseData = [NSURLConnection sendSynchronousRequest:request returningResponse:response error:error];
-    return responseData;
+    // Should be overrided by TDClient
+    return [NSData dataWithBytes:"" length:0];
 }
 
 - (BOOL)handleError:(NSError **)error withErrorMessage:(NSString *)errorMessage {
