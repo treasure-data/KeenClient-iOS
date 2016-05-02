@@ -14,6 +14,5 @@ Pod::Spec.new do |spec|
   spec.source_files = 'KeenClient/*.{h,m}','Library/sqlite-amalgamation/*.{h,c}'
   spec.public_header_files = 'KeenClient/*.h'
   spec.private_header_files = 'Library/sqlite-amalgamation/*.h'
-  spec.frameworks   = 'CoreLocation'
   spec.requires_arc = true
 end
