@@ -112,9 +112,8 @@ static KIOEventStore *eventStore;
  @param response The response being returned.
  @param error If an error occurred, filled in.  Otherwise nil.
  */
-- (NSData *)sendEvents:(NSData *)data 
-     returningResponse:(NSURLResponse **)response 
-                 error:(NSError **)error;
+- (void)sendEvents:(NSData *)data completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler;
+
 
 /**
  Handles the HTTP response from the keen API.  This involves deserializing the JSON response
@@ -742,12 +741,10 @@ static KIOEventStore *eventStore;
 
         if ([data length] > 0) {
             // then make an http request to the keen server.
-            NSURLResponse *response = nil;
-            NSError *error = nil;
-            NSData *responseData = [self sendEvents:data returningResponse:&response error:&error];
-            
-            // then parse the http response and deal with it appropriately
-            [self handleAPIResponse:response andData:responseData forEvents:eventIds];
+            [self sendEvents:data completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                // then parse the http response and deal with it appropriately
+                [self handleAPIResponse:response andData:data forEvents:eventIds];
+            }];
         }
     }
 }
@@ -850,9 +847,8 @@ static KIOEventStore *eventStore;
 
 # pragma mark - HTTP request/response management
 
-- (NSData *)sendEvents:(NSData *)data returningResponse:(NSURLResponse **)response error:(NSError **)error {
-    // Should be overrided by TDClient
-    return [NSData dataWithBytes:"" length:0];
+- (void)sendEvents:(NSData *)data completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler {
+  // Should be overrided by TDClient
 }
 
 - (BOOL)handleError:(NSError **)error withErrorMessage:(NSString *)errorMessage {
