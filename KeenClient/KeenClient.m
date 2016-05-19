@@ -891,6 +891,14 @@ static KIOEventStore *eventStore;
 }
 
 # pragma mark - Extending KeenClient library
+- (void)uploadWithFinishedBlock:(void (^)()) block {
+    dispatch_async(self.uploadQueue, ^{
+        [self uploadHelper:block onError:^(NSString* errorCode, NSString* message) {
+            block();
+        }];
+    });
+}
+
 - (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
     dispatch_async(self.uploadQueue, ^{
         [self uploadHelper:onSuccess onError:onError];

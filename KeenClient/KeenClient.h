@@ -224,6 +224,20 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 - (BOOL)addEvent:(NSDictionary *)event withKeenProperties:(KeenProperties *)keenProperties toEventCollection:(NSString *)eventCollection error:(NSError **)anError;
 
 /**
+ Call this whenever you want to upload all the events captured so far.  This will spawn a low
+ priority background thread and process all required HTTP requests.
+
+ If an upload fails, the events will be saved for a later attempt.
+ 
+ If a particular event is invalid, the event will be dropped from the queue and the failure message
+ will be logged.
+
+ @param block The block to be executed once uploading is finished, regardless of whether or not the upload succeeded.
+ The block is also called when no upload was necessary because no events were captured.
+ */
+- (void)uploadWithFinishedBlock:(void (^)())block;
+
+/**
  Returns the Keen SDK Version
  
  @return The current SDK version string.
