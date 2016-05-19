@@ -100,11 +100,6 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 /**
  For TD extention
  */
-@property (nonatomic, strong) void (^onSuccessInUploadEvents) ();
-@property (nonatomic, strong) void (^onErrorInUploadEvents) (NSString* errorCode, NSString* message);
-@property (nonatomic, strong) void (^onSuccessInAddEvent) ();
-@property (nonatomic, strong) void (^onErrorInAddEvents) (NSString* errorCode, NSString* message);
-
 - (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError;
 - (void)addEventWithCallbacks:(NSDictionary *)event
             toEventCollection:(NSString *)eventCollection
@@ -231,12 +226,12 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 /**
  Call this whenever you want to upload all the events captured so far.  This will spawn a low
  priority background thread and process all required HTTP requests.
- 
+
  If an upload fails, the events will be saved for a later attempt.
  
  If a particular event is invalid, the event will be dropped from the queue and the failure message
  will be logged.
- 
+
  @param block The block to be executed once uploading is finished, regardless of whether or not the upload succeeded.
  The block is also called when no upload was necessary because no events were captured.
  */

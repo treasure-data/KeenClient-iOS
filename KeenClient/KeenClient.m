@@ -106,25 +106,13 @@ static KIOEventStore *eventStore;
 - (NSString *)pathForEventInCollection:(NSString *)collection
                          WithTimestamp:(NSDate *)timestamp;
 
-/**
- Sends an event to the server. Internal impl.
- @param data The data to send.
- @param response The response being returned.
- @param error If an error occurred, filled in.  Otherwise nil.
- */
 - (void)sendEvents:(NSData *)data completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler;
 
-
-/**
- Handles the HTTP response from the keen API.  This involves deserializing the JSON response
- and then removing any events from the local filesystem that have been handled by the keen API.
- @param response The response from the server.
- @param responseData The data returned from the server.
- @param eventPaths A dictionary that maps events to their paths on the file system.
- */
-- (void)handleAPIResponse:(NSURLResponse *)response 
-                  andData:(NSData *)responseData 
-                forEvents:(NSDictionary *)events;
+- (void)handleAPIResponse:(NSURLResponse *)response
+                  andData:(NSData *)responseData
+                forEvents:(NSDictionary *)eventIds
+                onSuccess:(void (^)())onSuccess
+                  onError:(void (^)(NSString*, NSString*))onError;
 
 /**
  Converts an NSDate* instance into a correctly formatted ISO-8601 compatible string.
@@ -139,11 +127,6 @@ static KIOEventStore *eventStore;
  @return Always return NO.
  */
 - (BOOL)handleError:(NSError **)error withErrorMessage:(NSString *)errorMessage;
-
-- (void)callOnSuccessInUploadEvents;
-
-- (void)callOnErrorInUploadEvents:(NSString*)errorCode message:(NSString*)message;
-
 @end
 
 @implementation KeenClient
@@ -534,7 +517,7 @@ static KIOEventStore *eventStore;
     }
 }
 
-- (void)prepareJSONData:(NSData **)jsonData andEventIds:(NSMutableDictionary **)eventIds {
+- (void)prepareJSONData:(NSData **)jsonData andEventIds:(NSMutableDictionary **)eventIds onError:(void (^)(NSString*, NSString*))onError {
     
     // set up the request dictionary we'll send out.
     NSMutableDictionary *requestDict = [NSMutableDictionary dictionary];
@@ -584,7 +567,9 @@ static KIOEventStore *eventStore;
         KCLog(@"An error occurred when serializing the final request data back to JSON: %@",
               [error localizedDescription]);
         // can't do much here.
-        [self callOnErrorInUploadEvents:ERROR_CODE_DATA_CONVERSION message:[NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]];
+        if (onError) {
+            onError(ERROR_CODE_DATA_CONVERSION, [NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]);
+        }
         return;
     }
     
@@ -720,7 +705,7 @@ static KIOEventStore *eventStore;
 
 # pragma mark - Uploading
 
-- (void)uploadHelper
+- (void)uploadHelper:(void (^)())onSuccess onError:(void (^)(NSString*, NSString*))onError
 {
     // only one thread should be doing an upload at a time.
     @synchronized(self) {
@@ -736,53 +721,33 @@ static KIOEventStore *eventStore;
 
         NSData *data = nil;
         NSMutableDictionary *eventIds = nil;
-        [self prepareJSONData:&data andEventIds:&eventIds];
+        [self prepareJSONData:&data andEventIds:&eventIds onError:onError];
         // get data for the API request we'll make
 
         if ([data length] > 0) {
             // then make an http request to the keen server.
             [self sendEvents:data completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                 // then parse the http response and deal with it appropriately
-                [self handleAPIResponse:response andData:data forEvents:eventIds];
+                [self handleAPIResponse:response andData:data forEvents:eventIds onSuccess:onSuccess onError:onError];
             }];
         }
     }
 }
 
-- (void)uploadWithFinishedBlock:(void (^)()) block {
-    if (self.isRunningTests) {
-        // run upload in same thread if we're in tests
-        [self uploadHelper];
-    } else {
-        // otherwise do it in the background to not interfere with UI operations
-        dispatch_async(self.uploadQueue, ^{
-            [self uploadHelper];
-            
-            // we're done uploading, call the main queue and execute the block
-            dispatch_async(dispatch_get_main_queue(), ^{
-                // finally, run the user-specific block (if there is one)
-                if (block) {
-                    KCLog(@"Running user-specified block.");
-                    @try {
-                        block();
-                    } @finally {
-                        // do nothing
-                    }
-                }
-            });
-        });
-    }
-}
-
 - (void)handleAPIResponse:(NSURLResponse *)response 
                   andData:(NSData *)responseData
-                forEvents:(NSDictionary *)eventIds {
+                forEvents:(NSDictionary *)eventIds
+                onSuccess:(void (^)())onSuccess
+                  onError:(void (^)(NSString*, NSString*))onError {
     if (!responseData) {
         KCLog(@"responseData was nil for some reason.  That's not great.");
         KCLog(@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]);
         
         NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
-        [self callOnErrorInUploadEvents:(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE) message:[NSString stringWithFormat:@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]]];
+        if (onError) {
+            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
+                    [NSString stringWithFormat:@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]]);
+        }
         return;
     }
     NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
@@ -796,7 +761,11 @@ static KIOEventStore *eventStore;
         if (error) {
             NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
             KCLog(@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString);
-            [self callOnErrorInUploadEvents:ERROR_CODE_DATA_CONVERSION message:[NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString]];
+            if (onError) {
+                onError(ERROR_CODE_DATA_CONVERSION,
+                        [NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@",
+                            [error localizedDescription], responseString]);
+            }
             return;
         }
         // now iterate through the keys of the response, which represent collection names
@@ -835,14 +804,19 @@ static KIOEventStore *eventStore;
                 count++;
             }
         }
-        [self callOnSuccessInUploadEvents];
+        if (onSuccess) {
+            onSuccess();
+        }
     } else {
         // response code was NOT 200, which means something else happened. log this.
         KCLog(@"Response code was NOT 200. It was: %ld", (long)responseCode);
         NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
         KCLog(@"Response body was: %@", responseString);
-        [self callOnErrorInUploadEvents:(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE) message:[NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode]];
-    }            
+        if (onError) {
+            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
+                    [NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode]);
+        }
+    }
 }
 
 # pragma mark - HTTP request/response management
@@ -917,28 +891,17 @@ static KIOEventStore *eventStore;
 }
 
 # pragma mark - Extending KeenClient library
-
-- (void) callOnSuccessInUploadEvents {
-    if (self.onSuccessInUploadEvents) {
-        self.onSuccessInUploadEvents();
-    }
-}
-
-- (void) callOnErrorInUploadEvents:(NSString*)errorCode message:(NSString*)message {
-    if (self.onErrorInUploadEvents) {
-        self.onErrorInUploadEvents(errorCode, message);
-    }
+- (void)uploadWithFinishedBlock:(void (^)()) block {
+    dispatch_async(self.uploadQueue, ^{
+        [self uploadHelper:block onError:^(NSString* errorCode, NSString* message) {
+            block();
+        }];
+    });
 }
 
 - (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
     dispatch_async(self.uploadQueue, ^{
-        self.onSuccessInUploadEvents = onSuccess;
-        self.onErrorInUploadEvents = onError;
-        
-        [self uploadHelper];
-
-        self.onSuccessInUploadEvents = nil;
-        self.onErrorInUploadEvents = nil;
+        [self uploadHelper:onSuccess onError:onError];
     });
 }
 
