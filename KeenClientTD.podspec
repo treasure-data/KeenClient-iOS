@@ -2,7 +2,7 @@ Pod::Spec.new do |spec|
   spec.name         = 'KeenClientTD'
   spec.version      = '3.2.28'
   spec.license      = { :type => 'MIT' }
-  spec.platforms    = { :ios => "", :tvos => "" }
+  spec.platforms    = { :ios => "5.0", :tvos => "5.0" }
   spec.homepage     = 'https://github.com/treasure-data/KeenClient-iOS'
   spec.authors      = { 'Mitsunori Komatsu' => 'mitsu@treasure-data.com' }
   spec.summary      = 'Keen iOS client library forked by TD.'
