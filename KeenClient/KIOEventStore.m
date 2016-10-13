@@ -74,6 +74,8 @@ static NSString *encKey = nil;
     }
     
     if (!dbIsTableCreated) {
+        // Calling `createTable` isn't atomic operation, but it's called by `init` and other methods that are in the dispatch queue.
+        // So it's safe.
         if(![self createTable]) {
             KCLog(@"Failed to create SQLite table!");
             return false;
@@ -531,22 +533,19 @@ static NSString *encKey = nil;
 }
 
 - (BOOL)createTable {
-    __block BOOL wasCreated = NO;
+    BOOL wasCreated = NO;
     
-    // we need to wait for the queue to finish because this method has a return value that we're manipulating in the queue
-    dispatch_sync(self.dbQueue, ^{
-        char *err;
-        NSString *sql = [NSString stringWithFormat:@"CREATE TABLE IF NOT EXISTS 'events' (ID INTEGER PRIMARY KEY AUTOINCREMENT, collection TEXT, projectId TEXT, eventData BLOB, pending INTEGER, dateCreated TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"];
-        if (keen_io_sqlite3_exec(keen_dbname, [sql UTF8String], NULL, NULL, &err) != SQLITE_OK) {
-            KCLog(@"Failed to create table: %@", [NSString stringWithCString:err encoding:NSUTF8StringEncoding]);
-            keen_io_sqlite3_free(err); // Free that error message
-            [self closeDB];
-        } else {
-            wasCreated = YES;
-        }
-        dbIsTableCreated = wasCreated;
-    });
-
+    char *err;
+    NSString *sql = [NSString stringWithFormat:@"CREATE TABLE IF NOT EXISTS 'events' (ID INTEGER PRIMARY KEY AUTOINCREMENT, collection TEXT, projectId TEXT, eventData BLOB, pending INTEGER, dateCreated TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"];
+    if (keen_io_sqlite3_exec(keen_dbname, [sql UTF8String], NULL, NULL, &err) != SQLITE_OK) {
+        KCLog(@"Failed to create table: %@", [NSString stringWithCString:err encoding:NSUTF8StringEncoding]);
+        keen_io_sqlite3_free(err); // Free that error message
+        [self closeDB];
+    }
+    else {
+        wasCreated = YES;
+    }
+    dbIsTableCreated = wasCreated;
 
     return wasCreated;
 }
