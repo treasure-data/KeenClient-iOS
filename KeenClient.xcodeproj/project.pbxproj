@@ -53,7 +53,6 @@
 		01BA1B0614E895BC00CF9F84 /* KeenConstants.m in Sources */ = {isa = PBXBuildFile; fileRef = 01BA1B0414E895BC00CF9F84 /* KeenConstants.m */; };
 		1296398D19C10B8500B2B653 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1296398C19C10B8500B2B653 /* Cocoa.framework */; };
 		1296398E19C10D0000B2B653 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
-		1296398F19C10D0000B2B653 /* keen_io_sqlite3ext.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F2197586EE00051390 /* keen_io_sqlite3ext.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		1296399019C10D0000B2B653 /* KeenClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 017EE12614E30C96000F3868 /* KeenClient.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		1296399119C10D0000B2B653 /* KeenProperties.h in Headers */ = {isa = PBXBuildFile; fileRef = 012E8A541672B9A90021F6FA /* KeenProperties.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		1296399219C10D0000B2B653 /* KeenConstants.h in Headers */ = {isa = PBXBuildFile; fileRef = 01BA1B0314E895BC00CF9F84 /* KeenConstants.h */; };
@@ -74,9 +73,6 @@
 		DE34F6F6197586EE00051390 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		DE34F6F7197586EE00051390 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		DE34F6F8197586EE00051390 /* keen_io_sqlite3.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */; settings = {ATTRIBUTES = (Private, ); }; };
-		DE34F6F9197586EE00051390 /* keen_io_sqlite3ext.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F2197586EE00051390 /* keen_io_sqlite3ext.h */; settings = {ATTRIBUTES = (Private, ); }; };
-		DE34F6FA197586EE00051390 /* keen_io_sqlite3ext.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F2197586EE00051390 /* keen_io_sqlite3ext.h */; settings = {ATTRIBUTES = (Private, ); }; };
-		DE34F6FB197586EE00051390 /* keen_io_sqlite3ext.h in Headers */ = {isa = PBXBuildFile; fileRef = DE34F6F2197586EE00051390 /* keen_io_sqlite3ext.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		DEFA50181947A66200F78E13 /* KIOEventStore.m in Sources */ = {isa = PBXBuildFile; fileRef = CA6410D718E37E7C00E53E3C /* KIOEventStore.m */; };
 		DEFA50191947A67E00F78E13 /* KIOEventStore.m in Sources */ = {isa = PBXBuildFile; fileRef = CA6410D718E37E7C00E53E3C /* KIOEventStore.m */; };
 		DEFA501A1947A70800F78E13 /* KIOEventStore.h in Headers */ = {isa = PBXBuildFile; fileRef = CA6410D618E37E7C00E53E3C /* KIOEventStore.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -165,7 +161,6 @@
 		CACE78C918EA0CD800A4AB5B /* KIOEventStore_PrivateMethods.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KIOEventStore_PrivateMethods.h; sourceTree = "<group>"; };
 		DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = keen_io_sqlite3.c; sourceTree = "<group>"; };
 		DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = keen_io_sqlite3.h; sourceTree = "<group>"; };
-		DE34F6F2197586EE00051390 /* keen_io_sqlite3ext.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = keen_io_sqlite3ext.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -364,7 +359,6 @@
 			children = (
 				DE34F6F0197586EE00051390 /* keen_io_sqlite3.c */,
 				DE34F6F1197586EE00051390 /* keen_io_sqlite3.h */,
-				DE34F6F2197586EE00051390 /* keen_io_sqlite3ext.h */,
 			);
 			path = "sqlite-amalgamation";
 			sourceTree = "<group>";
@@ -380,7 +374,6 @@
 				010EB07F1676CF34002B07B6 /* KeenProperties.h in Headers */,
 				DEFA501B1947A72600F78E13 /* KIOEventStore.h in Headers */,
 				DE34F6F7197586EE00051390 /* keen_io_sqlite3.h in Headers */,
-				DE34F6FA197586EE00051390 /* keen_io_sqlite3ext.h in Headers */,
 				0111012D14EF709A009794A5 /* KeenConstants.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -393,7 +386,6 @@
 				010EB0801676CF41002B07B6 /* KeenProperties.h in Headers */,
 				DEFA501A1947A70800F78E13 /* KIOEventStore.h in Headers */,
 				DE34F6F8197586EE00051390 /* keen_io_sqlite3.h in Headers */,
-				DE34F6FB197586EE00051390 /* keen_io_sqlite3ext.h in Headers */,
 				0111014514EF70AB009794A5 /* KeenConstants.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -406,7 +398,6 @@
 				012E8A561672B9A90021F6FA /* KeenProperties.h in Headers */,
 				CA6410D818E37E7C00E53E3C /* KIOEventStore.h in Headers */,
 				DE34F6F6197586EE00051390 /* keen_io_sqlite3.h in Headers */,
-				DE34F6F9197586EE00051390 /* keen_io_sqlite3ext.h in Headers */,
 				01BA1B0514E895BC00CF9F84 /* KeenConstants.h in Headers */,
 				6B5B5C1A19C98A78006BA1B3 /* MF_Base64Additions.h in Headers */,
 			);
@@ -420,7 +411,6 @@
 				1296399119C10D0000B2B653 /* KeenProperties.h in Headers */,
 				1296399319C10D0000B2B653 /* KIOEventStore.h in Headers */,
 				1296398E19C10D0000B2B653 /* keen_io_sqlite3.h in Headers */,
-				1296398F19C10D0000B2B653 /* keen_io_sqlite3ext.h in Headers */,
 				1296399219C10D0000B2B653 /* KeenConstants.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
