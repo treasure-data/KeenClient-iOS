@@ -731,6 +731,12 @@ static KIOEventStore *eventStore;
                 [self handleAPIResponse:response andData:data forEvents:eventIds onSuccess:onSuccess onError:onError];
             }];
         }
+        else {
+            // Callback may be needed even when bufferred data is empty to use the callback as a trigger of something in an application
+            if (onSuccess) {
+                onSuccess();
+            }
+        }
     }
 }
 
