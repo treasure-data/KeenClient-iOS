@@ -11,8 +11,13 @@ Pod::Spec.new do |spec|
                       This is a forked project by TD. The original cool project is https://github.com/keenlabs/KeenClient-iOS.
                       DESC
   spec.source       = { :git => 'https://github.com/treasure-data/KeenClient-iOS.git', :tag => 'td_3.2.32' }
-  spec.source_files = 'KeenClient/*.{h,m}','Library/sqlite-amalgamation/*.{h,c}'
+  spec.source_files = 'KeenClient/*.{h,m}'
   spec.public_header_files = 'KeenClient/*.h'
-  spec.private_header_files = 'Library/sqlite-amalgamation/*.h'
   spec.requires_arc = true
+
+  spec.subspec 'keen_sqlite' do |ks|
+    ks.source_files = 'Library/sqlite-amalgamation/*.{h,c}'
+    ks.private_header_files = 'Library/sqlite-amalgamation/*.h'
+    ks.compiler_flags = '-w', '-Xanalyzer', '-analyzer-disable-all-checks'
+  end
 end
