@@ -100,10 +100,10 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
 /**
  For TD extention
  */
-- (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError;
+- (void)uploadWithCallbacks:(void(^)(void))onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError;
 - (void)addEventWithCallbacks:(NSDictionary *)event
             toEventCollection:(NSString *)eventCollection
-                    onSuccess:(void(^)())onSuccess
+                    onSuccess:(void(^)(void))onSuccess
                       onError:(void (^)(NSString* errorCode, NSString* message))onError;
 + (void)initializeEncryptionKey:(NSString*)encryptionKey;
 
@@ -235,7 +235,7 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
  @param block The block to be executed once uploading is finished, regardless of whether or not the upload succeeded.
  The block is also called when no upload was necessary because no events were captured.
  */
-- (void)uploadWithFinishedBlock:(void (^)())block;
+- (void)uploadWithFinishedBlock:(void (^)(void))block;
 
 /**
  Returns the Keen SDK Version

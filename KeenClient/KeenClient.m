@@ -111,7 +111,7 @@ static KIOEventStore *eventStore;
 - (void)handleAPIResponse:(NSURLResponse *)response
                   andData:(NSData *)responseData
                 forEvents:(NSDictionary *)eventIds
-                onSuccess:(void (^)())onSuccess
+                onSuccess:(void (^)(void))onSuccess
                   onError:(void (^)(NSString*, NSString*))onError;
 
 /**
@@ -354,7 +354,7 @@ static KIOEventStore *eventStore;
 }
 
 - (BOOL)addEvent:(NSDictionary *)event withKeenProperties:(KeenProperties *)keenProperties toEventCollection:(NSString *)eventCollection error:(NSError **) anError
-       onSuccess:(void(^)())onSuccess
+       onSuccess:(void(^)(void))onSuccess
          onError:(void (^)(NSString* errorCode, NSString* message))onError {
     // make sure the write key has been set - can't do anything without that
     if (![KeenClient validateKey:self.writeKey]) {
@@ -705,7 +705,7 @@ static KIOEventStore *eventStore;
 
 # pragma mark - Uploading
 
-- (void)uploadHelper:(void (^)())onSuccess onError:(void (^)(NSString*, NSString*))onError
+- (void)uploadHelper:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError
 {
     // only one thread should be doing an upload at a time.
     @synchronized(self) {
@@ -743,7 +743,7 @@ static KIOEventStore *eventStore;
 - (void)handleAPIResponse:(NSURLResponse *)response 
                   andData:(NSData *)responseData
                 forEvents:(NSDictionary *)eventIds
-                onSuccess:(void (^)())onSuccess
+                onSuccess:(void (^)(void))onSuccess
                   onError:(void (^)(NSString*, NSString*))onError {
     if (!responseData) {
         KCLog(@"responseData was nil for some reason.  That's not great.");
@@ -897,7 +897,7 @@ static KIOEventStore *eventStore;
 }
 
 # pragma mark - Extending KeenClient library
-- (void)uploadWithFinishedBlock:(void (^)()) block {
+- (void)uploadWithFinishedBlock:(void (^)(void)) block {
     dispatch_async(self.uploadQueue, ^{
         [self uploadHelper:block onError:^(NSString* errorCode, NSString* message) {
             block();
@@ -905,7 +905,7 @@ static KIOEventStore *eventStore;
     });
 }
 
-- (void)uploadWithCallbacks:(void(^)())onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
+- (void)uploadWithCallbacks:(void(^)(void))onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
     dispatch_async(self.uploadQueue, ^{
         [self uploadHelper:onSuccess onError:onError];
     });
@@ -913,7 +913,7 @@ static KIOEventStore *eventStore;
 
 - (void)addEventWithCallbacks:(NSDictionary *)event
             toEventCollection:(NSString *)eventCollection
-                    onSuccess:(void(^)())onSuccess
+                    onSuccess:(void(^)(void))onSuccess
                       onError:(void (^)(NSString* errorCode, NSString* message))onError {
     if (!onSuccess)
         onSuccess = ^(){};
