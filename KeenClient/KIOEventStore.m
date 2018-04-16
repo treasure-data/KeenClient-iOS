@@ -199,22 +199,22 @@ static NSString *encKey = nil;
             return;
         }
         
-        if (keen_io_sqlite3_bind_text(insert_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->insert_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to add event statement"];
             return;
         }
         
-        if (keen_io_sqlite3_bind_text(insert_stmt, 2, [coll UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->insert_stmt, 2, [coll UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind coll to add event statement"];
             return;
         }
         
-        if (keen_io_sqlite3_bind_blob(insert_stmt, 3, [eventData bytes], (int) [eventData length], SQLITE_TRANSIENT) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_blob(self->insert_stmt, 3, [eventData bytes], (int) [eventData length], SQLITE_TRANSIENT) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind insert statement"];
             return;
         }
         
-        if (keen_io_sqlite3_step(insert_stmt) != SQLITE_DONE) {
+        if (keen_io_sqlite3_step(self->insert_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"insert event"];
             return;
         }
@@ -222,9 +222,9 @@ static NSString *encKey = nil;
         wasAdded = YES;
         
         // You must reset before the commit happens in SQLite. Doing this now!
-        keen_io_sqlite3_reset(insert_stmt);
+        keen_io_sqlite3_reset(self->insert_stmt);
         // Clears off the bindings for future uses.
-        keen_io_sqlite3_clear_bindings(insert_stmt);
+        keen_io_sqlite3_clear_bindings(self->insert_stmt);
     });
     
     return wasAdded;
@@ -249,35 +249,35 @@ static NSString *encKey = nil;
             return;
         }
 
-        if (keen_io_sqlite3_bind_text(find_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->find_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to find statement"];
             return;
         }
 
-        while (keen_io_sqlite3_step(find_stmt) == SQLITE_ROW) {
+        while (keen_io_sqlite3_step(self->find_stmt) == SQLITE_ROW) {
             // Fetch data out the statement
-            long long eventId = keen_io_sqlite3_column_int64(find_stmt, 0);
+            long long eventId = keen_io_sqlite3_column_int64(self->find_stmt, 0);
 
-            NSString *coll = [NSString stringWithUTF8String:(char *)keen_io_sqlite3_column_text(find_stmt, 1)];
+            NSString *coll = [NSString stringWithUTF8String:(char *)keen_io_sqlite3_column_text(self->find_stmt, 1)];
 
-            const void *dataPtr = keen_io_sqlite3_column_blob(find_stmt, 2);
-            int dataSize = keen_io_sqlite3_column_bytes(find_stmt, 2);
+            const void *dataPtr = keen_io_sqlite3_column_blob(self->find_stmt, 2);
+            int dataSize = keen_io_sqlite3_column_bytes(self->find_stmt, 2);
 
             NSData *data = [[NSData alloc] initWithBytes:dataPtr length:dataSize];
 
             // Bind and mark the event pending.
-            if(keen_io_sqlite3_bind_int64(make_pending_stmt, 1, eventId) != SQLITE_OK) {
+            if(keen_io_sqlite3_bind_int64(self->make_pending_stmt, 1, eventId) != SQLITE_OK) {
                 [self handleSQLiteFailure:@"bind int for make pending"];
                 return;
             }
-            if (keen_io_sqlite3_step(make_pending_stmt) != SQLITE_DONE) {
+            if (keen_io_sqlite3_step(self->make_pending_stmt) != SQLITE_DONE) {
                 [self handleSQLiteFailure:@"mark event pending"];
                 return;
             }
 
             // Reset the pendifier
-            keen_io_sqlite3_reset(make_pending_stmt);
-            keen_io_sqlite3_clear_bindings(make_pending_stmt);
+            keen_io_sqlite3_reset(self->make_pending_stmt);
+            keen_io_sqlite3_clear_bindings(self->make_pending_stmt);
 
             if ([events objectForKey:coll] == nil) {
                 // We don't have an entry in the dictionary yet for this collection
@@ -319,8 +319,8 @@ static NSString *encKey = nil;
         }
 
         // Reset things
-        keen_io_sqlite3_reset(find_stmt);
-        keen_io_sqlite3_clear_bindings(find_stmt);
+        keen_io_sqlite3_reset(self->find_stmt);
+        keen_io_sqlite3_clear_bindings(self->find_stmt);
     });
     
     return events;
@@ -334,16 +334,16 @@ static NSString *encKey = nil;
             KCLog(@"DB is closed, skipping resetPendingEvents");
             return;
         }
-        if (keen_io_sqlite3_bind_text(reset_pending_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->reset_pending_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to reset pending statement"];
             return;
         }
-        if (keen_io_sqlite3_step(reset_pending_stmt) != SQLITE_DONE) {
+        if (keen_io_sqlite3_step(self->reset_pending_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"reset pending events"];
             return;
         }
-        keen_io_sqlite3_reset(reset_pending_stmt);
-        keen_io_sqlite3_clear_bindings(reset_pending_stmt);
+        keen_io_sqlite3_reset(self->reset_pending_stmt);
+        keen_io_sqlite3_clear_bindings(self->reset_pending_stmt);
     });
 }
 
@@ -367,18 +367,18 @@ static NSString *encKey = nil;
             KCLog(@"DB is closed, skipping getPendingEventcount");
             return;
         }
-        if (keen_io_sqlite3_bind_text(count_pending_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->count_pending_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to count pending statement"];
             return;
         }
-        if (keen_io_sqlite3_step(count_pending_stmt) == SQLITE_ROW) {
-            eventCount = (NSInteger) keen_io_sqlite3_column_int(count_pending_stmt, 0);
+        if (keen_io_sqlite3_step(self->count_pending_stmt) == SQLITE_ROW) {
+            eventCount = (NSInteger) keen_io_sqlite3_column_int(self->count_pending_stmt, 0);
         } else {
             [self handleSQLiteFailure:@"get count of pending rows"];
             return;
         }
-        keen_io_sqlite3_reset(count_pending_stmt);
-        keen_io_sqlite3_clear_bindings(count_pending_stmt);
+        keen_io_sqlite3_reset(self->count_pending_stmt);
+        keen_io_sqlite3_clear_bindings(self->count_pending_stmt);
     });
     
     return eventCount;
@@ -395,18 +395,18 @@ static NSString *encKey = nil;
             KCLog(@"DB is closed, skipping getTotalEventCount");
             return;
         }
-        if (keen_io_sqlite3_bind_text(count_all_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->count_all_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to total event statement"];
             return;
         }
-        if (keen_io_sqlite3_step(count_all_stmt) == SQLITE_ROW) {
-            eventCount = (NSInteger) keen_io_sqlite3_column_int(count_all_stmt, 0);
+        if (keen_io_sqlite3_step(self->count_all_stmt) == SQLITE_ROW) {
+            eventCount = (NSInteger) keen_io_sqlite3_column_int(self->count_all_stmt, 0);
         } else {
             [self handleSQLiteFailure:@"get count of total rows"];
             return;
         }
-        keen_io_sqlite3_reset(count_all_stmt);
-        keen_io_sqlite3_clear_bindings(count_all_stmt);
+        keen_io_sqlite3_reset(self->count_all_stmt);
+        keen_io_sqlite3_clear_bindings(self->count_all_stmt);
     });
     
     return eventCount;
@@ -420,16 +420,16 @@ static NSString *encKey = nil;
             KCLog(@"DB is closed, skipping deleteEvent");
             return;
         }
-        if (keen_io_sqlite3_bind_int64(delete_stmt, 1, [eventId unsignedLongLongValue]) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_int64(self->delete_stmt, 1, [eventId unsignedLongLongValue]) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind eventid to delete statement"];
             return;
         }
-        if (keen_io_sqlite3_step(delete_stmt) != SQLITE_DONE) {
+        if (keen_io_sqlite3_step(self->delete_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"delete event"];
             return;
         };
-        keen_io_sqlite3_reset(delete_stmt);
-        keen_io_sqlite3_clear_bindings(delete_stmt);
+        keen_io_sqlite3_reset(self->delete_stmt);
+        keen_io_sqlite3_clear_bindings(self->delete_stmt);
     });
 }
 
@@ -439,12 +439,12 @@ static NSString *encKey = nil;
             KCLog(@"DB is closed, skipping deleteEvent");
             return;
         }
-        if (keen_io_sqlite3_step(delete_all_stmt) != SQLITE_DONE) {
+        if (keen_io_sqlite3_step(self->delete_all_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"delete all events"];
             return;
         };
-        keen_io_sqlite3_reset(delete_all_stmt);
-        keen_io_sqlite3_clear_bindings(delete_all_stmt);
+        keen_io_sqlite3_reset(self->delete_all_stmt);
+        keen_io_sqlite3_clear_bindings(self->delete_all_stmt);
     });
 }
 
@@ -454,16 +454,16 @@ static NSString *encKey = nil;
             KCLog(@"DB is closed, skipping deleteEvent");
             return;
         }
-        if (keen_io_sqlite3_bind_int64(age_out_stmt, 1, [offset unsignedLongLongValue]) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_int64(self->age_out_stmt, 1, [offset unsignedLongLongValue]) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind offset to ageOut statement"];
             return;
         }
-        if (keen_io_sqlite3_step(age_out_stmt) != SQLITE_DONE) {
+        if (keen_io_sqlite3_step(self->age_out_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"delete all events"];
             return;
         };
-        keen_io_sqlite3_reset(age_out_stmt);
-        keen_io_sqlite3_clear_bindings(age_out_stmt);
+        keen_io_sqlite3_reset(self->age_out_stmt);
+        keen_io_sqlite3_clear_bindings(self->age_out_stmt);
     });
 }
 
@@ -476,17 +476,17 @@ static NSString *encKey = nil;
             KCLog(@"DB is closed, skipping purgePendingEvents");
             return;
         }
-        if (keen_io_sqlite3_bind_text(purge_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->purge_stmt, 1, [self.projectId UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind pid to purge statement"];
             return;
         }
-        if (keen_io_sqlite3_step(purge_stmt) != SQLITE_DONE) {
+        if (keen_io_sqlite3_step(self->purge_stmt) != SQLITE_DONE) {
             [self handleSQLiteFailure:@"purge pending events"];
             // XXX What to do here?
             return;
         };
-        keen_io_sqlite3_reset(purge_stmt);
-        keen_io_sqlite3_clear_bindings(purge_stmt);
+        keen_io_sqlite3_reset(self->purge_stmt);
+        keen_io_sqlite3_clear_bindings(self->purge_stmt);
     });
 }
 
@@ -611,21 +611,21 @@ static NSString *encKey = nil;
             return;
         }
         // bind
-        if (keen_io_sqlite3_bind_text(convert_date_stmt, 1, [[NSString stringWithFormat:@"%f", [date timeIntervalSince1970]] UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
+        if (keen_io_sqlite3_bind_text(self->convert_date_stmt, 1, [[NSString stringWithFormat:@"%f", [date timeIntervalSince1970]] UTF8String], -1, SQLITE_STATIC) != SQLITE_OK) {
             [self handleSQLiteFailure:@"bind date to date conversion statement"];
             return;
         }
         
-        if (keen_io_sqlite3_step(convert_date_stmt) != SQLITE_ROW) {
+        if (keen_io_sqlite3_step(self->convert_date_stmt) != SQLITE_ROW) {
             [self handleSQLiteFailure:@"date conversion"];
             return;
         }
         
-        iso8601 = [[NSString stringWithUTF8String:(char *)keen_io_sqlite3_column_text(convert_date_stmt, 0)] stringByAppendingString:offsetString];
+        iso8601 = [[NSString stringWithUTF8String:(char *)keen_io_sqlite3_column_text(self->convert_date_stmt, 0)] stringByAppendingString:offsetString];
         
         // reset things
-        keen_io_sqlite3_reset(convert_date_stmt);
-        keen_io_sqlite3_clear_bindings(convert_date_stmt);
+        keen_io_sqlite3_reset(self->convert_date_stmt);
+        keen_io_sqlite3_clear_bindings(self->convert_date_stmt);
     });
     
     return iso8601;
