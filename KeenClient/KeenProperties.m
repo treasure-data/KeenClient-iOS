@@ -11,7 +11,6 @@
 @implementation KeenProperties
 
 @synthesize timestamp=_timestamp;
-@synthesize location=_location;
 
 - (id)init {
     self = [super init];
@@ -22,7 +21,7 @@
 }
 
 - (NSString *)description {
-    return [NSString stringWithFormat:@"{ timestamp = %@, location = %@}", self.timestamp, self.location];
+    return [NSString stringWithFormat:@"{ timestamp = %@ }", self.timestamp];
 }
 
 
