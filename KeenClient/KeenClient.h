@@ -7,7 +7,6 @@
 //
 
 #import <Foundation/Foundation.h>
-#import <CoreLocation/CoreLocation.h>
 #import "KIOEventStore.h"
 #import "KeenProperties.h"
 
@@ -27,7 +26,7 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
     [[KeenClient sharedClient] addEvent:myEvent toEventCollection:@"purchases"];
     [[KeenClient sharedClient] uploadWithFinishedBlock:nil];
  */
-@interface KeenClient : NSObject <CLLocationManagerDelegate>
+@interface KeenClient : NSObject
 
 /**
  This Objective-C property represents the Keen Global Properties dictionary for this instance of the
@@ -89,13 +88,6 @@ typedef NSDictionary* (^KeenGlobalPropertiesBlock)(NSString *eventCollection);
  
  */
 @property (nonatomic, copy) KeenGlobalPropertiesBlock globalPropertiesBlock;
-
-/**
- A property that holds the current location of the device. You can either call
- [KeenClient refreshCurrentLocation] to pull location from the device or you can set this property with
- your own value.
- */
-@property (nonatomic, strong) CLLocation *currentLocation;
 
 /**
  For TD extention

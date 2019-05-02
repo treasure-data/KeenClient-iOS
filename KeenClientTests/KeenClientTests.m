@@ -234,32 +234,6 @@
     XCTAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
 }
 
-- (void)testEventWithLocation {
-    KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-    KeenClient *clientI = [[KeenClient alloc] initWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-
-    KeenProperties *keenProperties = [[[KeenProperties alloc] init] autorelease];
-    CLLocation *location = [[[CLLocation alloc] initWithLatitude:37.73 longitude:-122.47] autorelease];
-    keenProperties.location = location;
-    [client addEvent:@{@"a": @"b"} withKeenProperties:keenProperties toEventCollection:@"foo" error:nil];
-    [clientI addEvent:@{@"a": @"b"} withKeenProperties:keenProperties toEventCollection:@"foo" error:nil];
-
-    NSDictionary *eventsForCollection = [[[KeenClient getEventStore] getEvents] objectForKey:@"foo"];
-    // Grab the first event we get back
-    NSData *eventData = [eventsForCollection objectForKey:[[eventsForCollection allKeys] objectAtIndex:0]];
-    NSError *error = nil;
-    NSDictionary *deserializedDict = [NSJSONSerialization JSONObjectWithData:eventData
-                                                                     options:0
-                                                                       error:&error];
-
-    NSDictionary *deserializedLocation = deserializedDict[@"keen"][@"location"];
-    NSArray *deserializedCoords = deserializedLocation[@"coordinates"];
-    /* We disable this feature.
-    XCTAssertEqualObjects(@-122.47, deserializedCoords[0], @"Longitude was incorrect.");
-    XCTAssertEqualObjects(@37.73, deserializedCoords[1], @"Latitude was incorrect.");
-    */
-}
-
 - (void)testEventWithDictionary {
     KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
     KeenClient *clientI = [[KeenClient alloc] initWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
@@ -286,9 +260,7 @@
     // set up a client with a location
     KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
     KeenClient *clientI = [[KeenClient alloc] initWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-    
-    CLLocation *location = [[[CLLocation alloc] initWithLatitude:37.73 longitude:-122.47] autorelease];
-    client.currentLocation = location;
+
     // add an event
     [client addEvent:@{@"a": @"b"} toEventCollection:@"foo" error:nil];
     [clientI addEvent:@{@"a": @"b"} toEventCollection:@"foo" error:nil];

@@ -9,7 +9,6 @@
 #import "KeenClient.h"
 #import "KeenConstants.h"
 #import "KIOEventStore.h"
-#import <CoreLocation/CoreLocation.h>
 
 
 static KeenClient *sharedClient;
@@ -26,9 +25,6 @@ static KIOEventStore *eventStore;
 
 // The Read Key for this particular client.
 @property (nonatomic, strong) NSString *readKey;
-
-// NSLocationManager
-@property (nonatomic, strong) CLLocationManager *locationManager;
 
 // How many times the previous timestamp has been used.
 @property (nonatomic) NSInteger numTimesTimestampUsed;
@@ -134,8 +130,6 @@ static KIOEventStore *eventStore;
 @synthesize projectId=_projectId;
 @synthesize writeKey=_writeKey;
 @synthesize readKey=_readKey;
-@synthesize locationManager=_locationManager;
-@synthesize currentLocation=_currentLocation;
 @synthesize numTimesTimestampUsed=_numTimesTimestampUsed;
 @synthesize isRunningTests=_isRunningTests;
 @synthesize globalPropertiesDictionary=_globalPropertiesDictionary;
@@ -500,18 +494,7 @@ static KIOEventStore *eventStore;
         KeenProperties *keenProperties = value;
         
         NSString *isoDate = [self convertDate:keenProperties.timestamp];
-        NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithObject:isoDate forKey:@"timestamp"];
-        
-        CLLocation *location = keenProperties.location;
-        if (location != nil) {
-            NSNumber *longitude = [NSNumber numberWithDouble:location.coordinate.longitude];
-            NSNumber *latitude = [NSNumber numberWithDouble:location.coordinate.latitude];
-            NSArray *coordinatesArray = [NSArray arrayWithObjects:longitude, latitude, nil];
-            NSDictionary *coordinatesDict = [NSDictionary dictionaryWithObject:coordinatesArray forKey:@"coordinates"];
-            [dict setObject:coordinatesDict forKey:@"location"];
-        }
-        
-        return dict;
+        return [NSMutableDictionary dictionaryWithObject:isoDate forKey:@"timestamp"];
     } else {
         return value;
     }
@@ -860,16 +843,7 @@ static KIOEventStore *eventStore;
         return [self convertDate:value];
     } else if ([value isKindOfClass:[KeenProperties class]]) {
         KeenProperties *keenProperties = (KeenProperties *)value;
-        NSMutableDictionary *dict = [NSMutableDictionary dictionaryWithObject:keenProperties.timestamp forKey:@"timestamp"];
-        CLLocation *location = keenProperties.location;
-        if (location != nil) {
-            NSNumber *longitude = [NSNumber numberWithDouble:location.coordinate.longitude];
-            NSNumber *latitude = [NSNumber numberWithDouble:location.coordinate.latitude];
-            NSArray *coordinatesArray = [NSArray arrayWithObjects:longitude, latitude, nil];
-            NSDictionary *coordinatesDict = [NSDictionary dictionaryWithObject:coordinatesArray forKey:@"coordinates"];
-            [dict setObject:coordinatesDict forKey:@"location"];
-        }
-        return dict;
+        return [NSMutableDictionary dictionaryWithObject:keenProperties.timestamp forKey:@"timestamp"];
     }
     return NULL;
 }
