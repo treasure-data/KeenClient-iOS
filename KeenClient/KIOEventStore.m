@@ -508,7 +508,11 @@ static NSString *encKey = nil;
 }
 
 - (NSString*)getDatabaseFilePath {
+    #if TARGET_OS_TV
+    NSString *libraryPath = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+    #else
     NSString *libraryPath = [NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+    #endif
     NSString *my_sqlfile = [libraryPath stringByAppendingPathComponent:@"keenEvents.sqlite"];
     return my_sqlfile;
 }
