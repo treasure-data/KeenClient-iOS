@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
   spec.name         = 'KeenClientTD'
-  spec.version      = '3.2.35'
+  spec.version      = '3.3.0'
   spec.license      = { :type => 'MIT' }
   spec.platforms    = { :ios => "6.0", :tvos => "9.0" }
   spec.homepage     = 'https://github.com/treasure-data/KeenClient-iOS'
