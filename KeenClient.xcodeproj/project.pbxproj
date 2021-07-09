@@ -276,6 +276,8 @@
 		017EE12314E30C96000F3868 /* KeenClient */ = {
 			isa = PBXGroup;
 			children = (
+				6B5B5C1819C98A78006BA1B3 /* MF_Base64Additions.h */,
+				6B5B5C1919C98A78006BA1B3 /* MF_Base64Additions.m */,
 				017EE12614E30C96000F3868 /* KeenClient.h */,
 				017EE12714E30C96000F3868 /* KeenClient.m */,
 				012E8A541672B9A90021F6FA /* KeenProperties.h */,
@@ -348,8 +350,6 @@
 		4FD7854C2684E966002BB3FA /* KeenClientInternal */ = {
 			isa = PBXGroup;
 			children = (
-				6B5B5C1819C98A78006BA1B3 /* MF_Base64Additions.h */,
-				6B5B5C1919C98A78006BA1B3 /* MF_Base64Additions.m */,
 				01BA1B0414E895BC00CF9F84 /* KeenConstants.m */,
 				01BA1B0314E895BC00CF9F84 /* KeenConstants.h */,
 			);
