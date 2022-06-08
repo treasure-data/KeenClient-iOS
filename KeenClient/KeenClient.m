@@ -564,6 +564,35 @@ static KIOEventStore *eventStore;
     }
 }
 
+
+-(NSDictionary *)eventsFromCollection:(NSString *)collectionName eventsData:(NSDictionary *)eventsData error:(NSError **)error {
+    // create a separate array for event data so our dictionary serializes properly
+    NSMutableArray *events = [NSMutableArray array];
+    NSMutableArray *eventIds = [NSMutableArray array];
+    
+    for (NSNumber *eid in eventsData) {
+        NSData *ev = [eventsData objectForKey:eid];
+        NSDictionary *eventDict = [NSJSONSerialization JSONObjectWithData:ev
+                                                                  options:0
+                                                                    error:error];
+        if (*error) {
+            KCLog(@"An error occurred when deserializing a saved event: %@", [*error localizedDescription]);
+            continue;
+        }
+        
+        // add it to the array of events
+        [events addObject:eventDict];
+        [eventIds addObject: eid];
+    }
+    return @{@"events": events, @"eventIds": eventIds};
+}
+
+-(NSData *)ingestRequestDataForEvents:(NSArray *)events error:(NSError **)error {
+    NSDictionary *requestDict = @{ @"events": events };
+    
+    return [NSJSONSerialization dataWithJSONObject:requestDict options:0 error:error];
+}
+
 # pragma mark - Directory/path management
 
 - (void)importFileData {
@@ -688,6 +717,63 @@ static KIOEventStore *eventStore;
 
 # pragma mark - Uploading
 
+- (void)uploadToIngest:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError {
+    // only one thread should be doing an upload at a time.
+    @synchronized(self) {
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+
+        // Check if we've done an import before. (A missing value returns NO)
+        if (![defaults boolForKey:@"didFSImport"]) {
+            // Slurp in any filesystem based events. This converts older fs-based
+            // event storage into newer SQL-lite based storage.
+            [self importFileData];
+        }
+        // get data for the API request we'll make
+        NSDictionary *events = [eventStore getEvents];
+        
+        NSError *error = nil;
+        for (NSString *collectionName in events) {
+            NSDictionary *collEvents = [events objectForKey:collectionName];
+            NSDictionary *eventDicts = [self eventsFromCollection:collectionName eventsData:collEvents error:&error];
+            NSArray *events = eventDicts[@"events"];
+            NSArray *eventIds = eventDicts[@"eventIds"];
+            NSData *requestData = [self ingestRequestDataForEvents:events error:&error];
+            
+            if (error) {
+                KCLog(@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]);
+                if (onError) {
+                    onError(ERROR_CODE_DATA_CONVERSION, [NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]);
+                }
+                return;
+            }
+            
+            if ([requestData length] > 0) {
+                NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
+
+                // then make an http request to the keen server.
+                [self sendEventsToIngest:requestData
+                                database:collNameComps[0]
+                                   table:collNameComps[1]
+                       completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                    // then parse the http response and deal with it appropriately
+                    [self handleIngestAPIResponse:response
+                                          andData:data
+                                forCollectionName:collectionName
+                                      andEventIds:eventIds
+                                        onSuccess:onSuccess
+                                          onError:onError];
+                }];
+            }
+            else {
+                // Callback may be needed even when bufferred data is empty to use the callback as a trigger of something in an application
+                if (onSuccess) {
+                    onSuccess();
+                }
+            }
+        }
+    }
+}
+
 - (void)uploadHelper:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError
 {
     // only one thread should be doing an upload at a time.
@@ -719,6 +805,88 @@ static KIOEventStore *eventStore;
             if (onSuccess) {
                 onSuccess();
             }
+        }
+    }
+}
+
+- (void)handleIngestAPIResponse:(NSURLResponse *)response
+                        andData:(NSData *)responseData
+              forCollectionName:(NSString *)collectionName
+                    andEventIds:(NSArray *)eventIds
+                      onSuccess:(void (^)(void))onSuccess
+                        onError:(void (^)(NSString*, NSString*))onError {
+    if (!responseData) {
+        KCLog(@"responseData was nil for some reason.  That's not great.");
+        KCLog(@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]);
+        
+        NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
+        if (onError) {
+            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
+                    [NSString stringWithFormat:@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]]);
+        }
+        return;
+    }
+    NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
+    // if the request succeeded, dig into the response to figure out which events succeeded and which failed
+    if (responseCode == 200) {
+        // deserialize the response
+        NSError *error = nil;
+        NSDictionary *responseDict = [NSJSONSerialization JSONObjectWithData:responseData
+                                                                     options:0
+                                                                       error:&error];
+        if (error) {
+            NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+            KCLog(@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString);
+            if (onError) {
+                onError(ERROR_CODE_DATA_CONVERSION,
+                        [NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@",
+                            [error localizedDescription], responseString]);
+            }
+            return;
+        }
+            // grab the results for this collection
+        NSArray *results = [responseDict objectForKey:@"receipts"];
+        // go through and delete any successes and failures because of user error
+        // (making sure to keep any failures due to server error)
+        NSUInteger count = 0;
+        for (NSDictionary *result in results) {
+            Boolean deleteFile = YES;
+            Boolean success = [[result objectForKey:kKeenSuccessParam] boolValue];
+            if (!success) {
+                // grab error code and description
+                NSDictionary *errorDict = [result objectForKey:kKeenErrorParam];
+                NSString *errorCode = [errorDict objectForKey:kKeenNameParam];
+                if ([errorCode isEqualToString:kKeenInvalidCollectionNameError] ||
+                    [errorCode isEqualToString:kKeenInvalidPropertyNameError] ||
+                    [errorCode isEqualToString:kKeenInvalidPropertyValueError]) {
+                    KCLog(@"An invalid event was found.  Deleting it.  Error: %@",
+                          [errorDict objectForKey:kKeenDescriptionParam]);
+                    deleteFile = YES;
+                } else {
+                    KCLog(@"The event could not be inserted for some reason.  Error name and description: %@, %@",
+                          errorCode, [errorDict objectForKey:kKeenDescriptionParam]);
+                    deleteFile = NO;
+                }
+            }
+            // delete the file if we need to
+            if (deleteFile) {
+                NSNumber *eid = [eventIds objectAtIndex:count];
+                [eventStore deleteEvent: eid];
+                KCLog(@"Successfully deleted event: %@", eid);
+            }
+            count++;
+        }
+        if (onSuccess) {
+            onSuccess();
+        }
+    } else {
+        // response code was NOT 200, which means something else happened. log this.
+        KCLog(@"Response code was NOT 200. It was: %ld", (long)responseCode);
+        NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+        KCLog(@"Response body was: %@", responseString);
+        if (onError) {
+            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
+                    [NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode]);
         }
     }
 }
@@ -814,6 +982,10 @@ static KIOEventStore *eventStore;
   // Should be overrided by TDClient
 }
 
+- (void)sendEventsToIngest:(NSData *)data database:(NSString *)database table:(NSString *)table completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler {
+    // Should be overrided by TDClient
+  }
+
 - (BOOL)handleError:(NSError **)error withErrorMessage:(NSString *)errorMessage {
     return [self handleError:error withErrorMessage:errorMessage underlayingError:nil];
 }
@@ -873,7 +1045,7 @@ static KIOEventStore *eventStore;
 # pragma mark - Extending KeenClient library
 - (void)uploadWithFinishedBlock:(void (^)(void)) block {
     dispatch_async(self.uploadQueue, ^{
-        [self uploadHelper:block onError:^(NSString* errorCode, NSString* message) {
+        [self uploadToIngest:block onError:^(NSString *errorCode, NSString *message) {
             block();
         }];
     });
@@ -881,7 +1053,7 @@ static KIOEventStore *eventStore;
 
 - (void)uploadWithCallbacks:(void(^)(void))onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
     dispatch_async(self.uploadQueue, ^{
-        [self uploadHelper:onSuccess onError:onError];
+        [self uploadToIngest:onSuccess onError:onError];
     });
 }
 
