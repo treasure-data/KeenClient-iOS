@@ -102,8 +102,6 @@ static KIOEventStore *eventStore;
 - (NSString *)pathForEventInCollection:(NSString *)collection
                          WithTimestamp:(NSDate *)timestamp;
 
-- (void)sendEvents:(NSData *)data completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler;
-
 - (void)handleAPIResponse:(NSURLResponse *)response
                   andData:(NSData *)responseData
                 forEvents:(NSDictionary *)eventIds
@@ -717,7 +715,7 @@ static KIOEventStore *eventStore;
 
 # pragma mark - Uploading
 
-- (void)uploadToIngest:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError {
+- (void)upload:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError {
     // only one thread should be doing an upload at a time.
     @synchronized(self) {
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -730,9 +728,20 @@ static KIOEventStore *eventStore;
         }
         // get data for the API request we'll make
         NSDictionary *events = [eventStore getEvents];
+        if (events.count == 0 && onSuccess) {
+            onSuccess();
+        }
         
         NSError *error = nil;
+        NSMutableSet *finishedUpload = [NSMutableSet new];
         for (NSString *collectionName in events) {
+            void (^handleOnSuccess)(void) = ^ {
+                [finishedUpload addObject:collectionName];
+                if (finishedUpload.count == events.count) {
+                    onSuccess();
+                }
+            };
+
             NSDictionary *collEvents = [events objectForKey:collectionName];
             NSDictionary *eventDicts = [self eventsFromCollection:collectionName eventsData:collEvents error:&error];
             NSArray *events = eventDicts[@"events"];
@@ -751,7 +760,7 @@ static KIOEventStore *eventStore;
                 NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
 
                 // then make an http request to the keen server.
-                [self sendEventsToIngest:requestData
+                [self sendEvents:requestData
                                 database:collNameComps[0]
                                    table:collNameComps[1]
                        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
@@ -760,7 +769,7 @@ static KIOEventStore *eventStore;
                                           andData:data
                                 forCollectionName:collectionName
                                       andEventIds:eventIds
-                                        onSuccess:onSuccess
+                                        onSuccess:handleOnSuccess
                                           onError:onError];
                 }];
             }
@@ -769,41 +778,6 @@ static KIOEventStore *eventStore;
                 if (onSuccess) {
                     onSuccess();
                 }
-            }
-        }
-    }
-}
-
-- (void)uploadHelper:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError
-{
-    // only one thread should be doing an upload at a time.
-    @synchronized(self) {
-
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
-        // Check if we've done an import before. (A missing value returns NO)
-        if (![defaults boolForKey:@"didFSImport"]) {
-            // Slurp in any filesystem based events. This converts older fs-based
-            // event storage into newer SQL-lite based storage.
-            [self importFileData];
-        }
-
-        NSData *data = nil;
-        NSMutableDictionary *eventIds = nil;
-        [self prepareJSONData:&data andEventIds:&eventIds onError:onError];
-        // get data for the API request we'll make
-
-        if ([data length] > 0) {
-            // then make an http request to the keen server.
-            [self sendEvents:data completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-                // then parse the http response and deal with it appropriately
-                [self handleAPIResponse:response andData:data forEvents:eventIds onSuccess:onSuccess onError:onError];
-            }];
-        }
-        else {
-            // Callback may be needed even when bufferred data is empty to use the callback as a trigger of something in an application
-            if (onSuccess) {
-                onSuccess();
             }
         }
     }
@@ -978,11 +952,7 @@ static KIOEventStore *eventStore;
 
 # pragma mark - HTTP request/response management
 
-- (void)sendEvents:(NSData *)data completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler {
-  // Should be overrided by TDClient
-}
-
-- (void)sendEventsToIngest:(NSData *)data database:(NSString *)database table:(NSString *)table completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler {
+- (void)sendEvents:(NSData *)data database:(NSString *)database table:(NSString *)table completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler {
     // Should be overrided by TDClient
   }
 
@@ -1045,7 +1015,7 @@ static KIOEventStore *eventStore;
 # pragma mark - Extending KeenClient library
 - (void)uploadWithFinishedBlock:(void (^)(void)) block {
     dispatch_async(self.uploadQueue, ^{
-        [self uploadToIngest:block onError:^(NSString *errorCode, NSString *message) {
+        [self upload:block onError:^(NSString *errorCode, NSString *message) {
             block();
         }];
     });
@@ -1053,7 +1023,7 @@ static KIOEventStore *eventStore;
 
 - (void)uploadWithCallbacks:(void(^)(void))onSuccess onError:(void (^)(NSString* errorCode, NSString* message))onError {
     dispatch_async(self.uploadQueue, ^{
-        [self uploadToIngest:onSuccess onError:onError];
+        [self upload:onSuccess onError:onError];
     });
 }
 
