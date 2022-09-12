@@ -737,7 +737,7 @@ static KIOEventStore *eventStore;
         for (NSString *collectionName in events) {
             void (^handleOnSuccess)(void) = ^ {
                 [finishedUpload addObject:collectionName];
-                if (finishedUpload.count == events.count) {
+                if (finishedUpload.count == events.count && onSuccess) {
                     onSuccess();
                 }
             };
