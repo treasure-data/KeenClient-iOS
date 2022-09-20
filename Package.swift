@@ -37,14 +37,12 @@ let package = Package(
             ],
             sources: [
                 "KeenClient/",
-                "KeenClientInternal/",
                 "Library/sqlite-amalgamation/",
             ],
             publicHeadersPath: "KeenClient",
             cxxSettings: [
                 .headerSearchPath("Library/sqlite-amalgamation"),
                 .headerSearchPath("KeenClient"),
-                .headerSearchPath("KeenClientInternal"),
             ]
         ),
     ],
