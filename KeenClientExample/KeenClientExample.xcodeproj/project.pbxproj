@@ -177,6 +177,7 @@
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 			);
 			mainGroup = 0105EE5214E9A4930048D871;
@@ -324,7 +325,7 @@
 					"KEEN_DEBUG=1",
 				);
 				INFOPLIST_FILE = "KeenClientExample/KeenClientExample-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 5.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../../../../../Library/Developer/Xcode/DerivedData/KeenClient-fbrempmyzeejllfqycmnmewgbkyt/Build/Products/Debug-iphoneos\"",
@@ -343,7 +344,7 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "KeenClientExample/KeenClientExample-Prefix.pch";
 				INFOPLIST_FILE = "KeenClientExample/KeenClientExample-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 5.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"\"$(SRCROOT)/../../../../../Library/Developer/Xcode/DerivedData/KeenClient-fbrempmyzeejllfqycmnmewgbkyt/Build/Products/Debug-iphoneos\"",
