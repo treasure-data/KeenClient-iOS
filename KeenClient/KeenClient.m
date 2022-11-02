@@ -402,18 +402,19 @@ static KIOEventStore *eventStore;
     // this is the event we'll actually write
     NSMutableDictionary *eventToWrite = [NSMutableDictionary dictionaryWithDictionary:event];
     
+    // Below code is commented out because we no longer support keen column in new Ingest API
     // either set "keen" only from keen properties or merge in
-    NSDictionary *originalKeenDict = [eventToWrite objectForKey:@"keen"];
-    if (originalKeenDict) {
-        // have to merge
-        NSMutableDictionary *keenDict = [self handleInvalidJSONInObject:keenProperties];
-        [keenDict addEntriesFromDictionary:originalKeenDict];
-        [eventToWrite setObject:keenDict forKey:@"keen"];
-        
-    } else {
-        // just set it directly
-        [eventToWrite setObject:keenProperties forKey:@"keen"];
-    }
+//    NSDictionary *originalKeenDict = [eventToWrite objectForKey:@"keen"];
+//    if (originalKeenDict) {
+//        // have to merge
+//        NSMutableDictionary *keenDict = [self handleInvalidJSONInObject:keenProperties];
+//        [keenDict addEntriesFromDictionary:originalKeenDict];
+//        [eventToWrite setObject:keenDict forKey:@"keen"];
+//
+//    } else {
+//        // just set it directly
+//        [eventToWrite setObject:keenProperties forKey:@"keen"];
+//    }
     
     NSError *error = nil;
     NSData *jsonData = [self serializeEventToJSON:eventToWrite error:&error];
