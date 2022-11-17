@@ -718,9 +718,9 @@ static KIOEventStore *eventStore;
 
 - (void)upload:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError {
     // only one thread should be doing an upload at a time.
-    @synchronized(self) {
+    @synchronized (self) {
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-
+        
         // Check if we've done an import before. (A missing value returns NO)
         if (![defaults boolForKey:@"didFSImport"]) {
             // Slurp in any filesystem based events. This converts older fs-based
@@ -734,15 +734,19 @@ static KIOEventStore *eventStore;
         }
         
         NSError *error = nil;
-        NSMutableSet *finishedUpload = [NSMutableSet new];
-        for (NSString *collectionName in events) {
-            void (^handleOnSuccess)(void) = ^ {
-                [finishedUpload addObject:collectionName];
-                if (finishedUpload.count == events.count && onSuccess) {
+        __block NSMutableSet *finishedUpload = [NSMutableSet new];
+        NSUInteger totalNumbrOfCollections = events.count;
+        void (^handleOnSuccess)(NSString *) = ^(NSString *cName) {
+            @synchronized (finishedUpload) {
+                if (finishedUpload == nil || onSuccess == nil) return;
+                [finishedUpload addObject:cName];
+                if (finishedUpload.count == totalNumbrOfCollections) {
                     onSuccess();
                 }
-            };
-
+            }
+        };
+        
+        for (NSString *collectionName in events) {
             NSDictionary *collEvents = [events objectForKey:collectionName];
             NSDictionary *eventDicts = [self eventsFromCollection:collectionName eventsData:collEvents error:&error];
             NSArray *events = eventDicts[@"events"];
@@ -759,12 +763,12 @@ static KIOEventStore *eventStore;
             
             if ([requestData length] > 0) {
                 NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
-
+                
                 // then make an http request to the keen server.
                 [self sendEvents:requestData
-                                database:collNameComps[0]
-                                   table:collNameComps[1]
-                       completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                        database:collNameComps[0]
+                           table:collNameComps[1]
+               completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                     // then parse the http response and deal with it appropriately
                     [self handleIngestAPIResponse:response
                                           andData:data
@@ -788,7 +792,7 @@ static KIOEventStore *eventStore;
                         andData:(NSData *)responseData
               forCollectionName:(NSString *)collectionName
                     andEventIds:(NSArray *)eventIds
-                      onSuccess:(void (^)(void))onSuccess
+                      onSuccess:(void (^)(NSString*))onSuccess
                         onError:(void (^)(NSString*, NSString*))onError {
     if (!responseData) {
         KCLog(@"responseData was nil for some reason.  That's not great.");
@@ -852,7 +856,7 @@ static KIOEventStore *eventStore;
             count++;
         }
         if (onSuccess) {
-            onSuccess();
+            onSuccess(collectionName);
         }
     } else {
         // response code was NOT 200, which means something else happened. log this.
