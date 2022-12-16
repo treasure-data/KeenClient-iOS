@@ -747,6 +747,9 @@ static KIOEventStore *eventStore;
         };
         
         for (NSString *collectionName in events) {
+            NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
+            if ([collNameComps count] != 2) {continue;}
+            
             NSDictionary *collEvents = [events objectForKey:collectionName];
             NSDictionary *eventDicts = [self eventsFromCollection:collectionName eventsData:collEvents error:&error];
             NSArray *events = eventDicts[@"events"];
@@ -762,7 +765,6 @@ static KIOEventStore *eventStore;
             }
             
             if ([requestData length] > 0) {
-                NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
                 
                 // then make an http request to the keen server.
                 [self sendEvents:requestData
@@ -848,7 +850,7 @@ static KIOEventStore *eventStore;
                 }
             }
             // delete the file if we need to
-            if (deleteFile) {
+            if (deleteFile && eventIds.count > count) {
                 NSNumber *eid = [eventIds objectAtIndex:count];
                 [eventStore deleteEvent: eid];
                 KCLog(@"Successfully deleted event: %@", eid);

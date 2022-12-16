@@ -24,6 +24,7 @@
 @property (nonatomic) Boolean isRunningTests;
 
 - (NSData *)sendEvents: (NSData *) data returningResponse: (NSURLResponse **) response error: (NSError **) error;
+- (void)sendEvents:(NSData *)data database:(NSString *)database table:(NSString *)table completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler;
 - (id)convertDate: (id) date;
 - (id)handleInvalidJSONInObject:(id)value;
 
@@ -209,12 +210,12 @@
     XCTAssertThrows([clientI addEvent:event toEventCollection:@"foo" error:nil], @"should throw an exception");
 }
 
-- (void)testEventWithTimestamp {
+- (void)testEventNoLongerAddTimestamp {
     KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
     KeenClient *clientI = [[KeenClient alloc] initWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
 
     NSDate *date = [NSDate date];
-    KeenProperties *keenProperties = [[[KeenProperties alloc] init] autorelease];
+    KeenProperties *keenProperties = [[KeenProperties alloc] init];
     keenProperties.timestamp = date;
     [client addEvent:@{@"a": @"b"} withKeenProperties:keenProperties toEventCollection:@"foo" error:nil];
     [clientI addEvent:@{@"a": @"b"} withKeenProperties:keenProperties toEventCollection:@"foo" error:nil];
@@ -228,10 +229,7 @@
                                                                   error:&error];
 
     NSString *deserializedDate = deserializedDict[@"keen"][@"timestamp"];
-    NSString *originalDate = [client convertDate:date];
-    XCTAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
-    originalDate = [clientI convertDate:date];
-    XCTAssertEqualObjects(originalDate, deserializedDate, @"If a timestamp is specified it should be used.");
+    XCTAssertEqualObjects(deserializedDate, nil, @"There should not be timestamp.");
 }
 
 - (void)testEventWithDictionary {
@@ -254,53 +252,6 @@
     XCTAssertEqualObjects(@"val1", deserializedDict[@"test_str_array"][0], @"array was incorrect");
     XCTAssertEqualObjects(@"val2", deserializedDict[@"test_str_array"][1], @"array was incorrect");
     XCTAssertEqualObjects(@"val3", deserializedDict[@"test_str_array"][2], @"array was incorrect");
-}
-
-- (void)testGeoLocation {
-    // set up a client with a location
-    KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-    KeenClient *clientI = [[KeenClient alloc] initWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-
-    // add an event
-    [client addEvent:@{@"a": @"b"} toEventCollection:@"foo" error:nil];
-    [clientI addEvent:@{@"a": @"b"} toEventCollection:@"foo" error:nil];
-    // now get the stored event
-    NSDictionary *eventsForCollection = [[[KeenClient getEventStore] getEvents] objectForKey:@"foo"];
-    // Grab the first event we get back
-    NSData *eventData = [eventsForCollection objectForKey:[[eventsForCollection allKeys] objectAtIndex:0]];
-    NSError *error = nil;
-    NSDictionary *deserializedDict = [NSJSONSerialization JSONObjectWithData:eventData
-                                                                     options:0
-                                                                       error:&error];
-
-    NSDictionary *deserializedLocation = deserializedDict[@"keen"][@"location"];
-    NSArray *deserializedCoords = deserializedLocation[@"coordinates"];
-    XCTAssertEqualObjects(@-122.47, deserializedCoords[0], @"Longitude was incorrect.");
-    XCTAssertEqualObjects(@37.73, deserializedCoords[1], @"Latitude was incorrect.");
-}
-
-- (void)testGeoLocationDisabled {
-    // now try the same thing but disable geo location
-    KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-    KeenClient *clientI = [[KeenClient alloc] initWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
-    
-    [KeenClient disableGeoLocation];
-    // add an event
-    [client addEvent:@{@"a": @"b"} toEventCollection:@"bar" error:nil];
-    [clientI addEvent:@{@"a": @"b"} toEventCollection:@"bar" error:nil];
-    // now get the stored event
-
-    // Grab the first event we get back
-    NSDictionary *eventsForCollection = [[[KeenClient getEventStore] getEvents] objectForKey:@"bar"];
-    // Grab the first event we get back
-    NSData *eventData = [eventsForCollection objectForKey:[[eventsForCollection allKeys] objectAtIndex:0]];
-    NSError *error = nil;
-    NSDictionary *deserializedDict = [NSJSONSerialization JSONObjectWithData:eventData
-                                                                     options:0
-                                                                       error:&error];
-
-    NSDictionary *deserializedLocation = deserializedDict[@"keen"][@"location"];
-    XCTAssertNil(deserializedLocation, @"No location should have been saved.");
 }
 
 - (void)testEventWithNonDictionaryKeen {
@@ -369,7 +320,7 @@
                                            andErrorCode:errorCode 
                                          andDescription:description];
     NSArray *array = [NSArray arrayWithObject:result];
-    return [NSDictionary dictionaryWithObject:array forKey:@"foo"];
+    return [NSDictionary dictionaryWithObject:array forKey:@"receipts"];
 }
 
 - (id)uploadTestHelperWithData:(id)data andStatusCode:(NSInteger)code {
@@ -383,7 +334,8 @@
     id mock = [OCMockObject partialMockForObject:client];
     
     // set up the response we're faking out
-    NSHTTPURLResponse *response = [[[NSHTTPURLResponse alloc] initWithURL:nil statusCode:code HTTPVersion:nil headerFields:nil] autorelease];
+    NSHTTPURLResponse *response = [[NSHTTPURLResponse alloc] initWithURL:nil statusCode:code HTTPVersion:nil headerFields:nil];
+
     
     // serialize the faked out response data
     data = [client handleInvalidJSONInObject:data];
@@ -391,9 +343,16 @@
                                                              options:0
                                                                error:nil];
     // set up the response data we're faking out
-    [[[mock stub] andReturn:serializedData] sendEvents:[OCMArg any] 
-                                     returningResponse:[OCMArg setTo:response] 
-                                                 error:[OCMArg setTo:nil]];
+//    [[[mock stub] andReturn:serializedData] sendEvents:[OCMArg any]
+//                                     returningResponse:[OCMArg setTo:response]
+//                                                 error:[OCMArg setTo:nil]];
+    
+    
+    [OCMStub([mock sendEvents:[OCMArg any] database:[OCMArg any] table:[OCMArg any] completionHandler:[OCMArg any]]) andDo:^(NSInvocation *invocation) {
+        void (^handler)(NSData *data, NSURLResponse *response, NSError *error);
+        [invocation getArgument:&handler atIndex:5];
+        handler(serializedData, response, nil);
+    }];
     
     return mock;
 }
@@ -409,94 +368,118 @@
     id mock = [OCMockObject partialMockForObject:client];
     
     // set up the response we're faking out
-    NSHTTPURLResponse *response = [[[NSHTTPURLResponse alloc] initWithURL:nil statusCode:code HTTPVersion:nil headerFields:nil] autorelease];
-    
+    NSHTTPURLResponse *response = [[NSHTTPURLResponse alloc] initWithURL:nil statusCode:code HTTPVersion:nil headerFields:nil];
+
     // serialize the faked out response data
     data = [client handleInvalidJSONInObject:data];
     NSData *serializedData = [NSJSONSerialization dataWithJSONObject:data
                                                              options:0
                                                                error:nil];
     // set up the response data we're faking out
-    [[[mock stub] andReturn:serializedData] sendEvents:[OCMArg any]
-                                     returningResponse:[OCMArg setTo:response]
-                                                 error:[OCMArg setTo:nil]];
+//    [[[mock stub] andReturn:serializedData] sendEvents:[OCMArg any]
+//                                     returningResponse:[OCMArg setTo:response]
+//                                                 error:[OCMArg setTo:nil]];
+    
+    [OCMStub([mock sendEvents:[OCMArg any] database:[OCMArg any] table:[OCMArg any] completionHandler:[OCMArg any]]) andDo:^(NSInvocation *invocation) {
+        void (^handler)(NSData *data, NSURLResponse *response, NSError *error);
+        [invocation getArgument:&handler atIndex:5];
+        handler(serializedData, response, nil);
+    }];
     
     return mock;
 }
 
 - (void)addSimpleEventAndUploadWithMock:(id)mock {
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
     
     // and "upload" it
     [mock uploadWithFinishedBlock:nil];
 }
 
+- (void)addSimpleEventAndUploadWithMock:(id)mock andExpect:(void (^)(void))expect {
+    // add an event
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    
+    // and "upload" it
+    [self uploadWithMock:mock andExpect:expect];
+}
+
+- (void)uploadWithMock:(id)mock andExpect:(void(^)(void))expect {
+    XCTestExpectation *expectation = [XCTestExpectation new];
+    
+    [mock uploadWithFinishedBlock: ^{
+        expect();
+        [expectation fulfill];
+    }];
+    
+    [self waitForExpectations:@[expectation] timeout:10];
+}
+
 - (void)testUploadSuccess {
     id mock = [self uploadTestHelperWithData:nil andStatusCode:200];
-    
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the event was deleted from the store
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
+
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
+    }];
 }
 
 - (void)testUploadSuccessInstanceClient {
     id mock = [self uploadTestHelperWithDataInstanceClient:nil andStatusCode:200];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the event was deleted from the store
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the event was deleted from the store
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0, @"There should be no files after a successful upload.");
+    }];
 }
 
 - (void)testUploadFailedServerDown {
     id mock = [self uploadTestHelperWithData:nil andStatusCode:500];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-
-    // make sure the file wasn't deleted from the store
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file wasn't deleted from the store
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    }];
 }
 
 - (void)testUploadFailedServerDownInstanceClient {
     id mock = [self uploadTestHelperWithDataInstanceClient:nil andStatusCode:500];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the file wasn't deleted from the store
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file wasn't deleted from the store
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    }];
 }
 
 - (void)testUploadFailedServerDownNonJsonResponse {
     id mock = [self uploadTestHelperWithData:@{} andStatusCode:500];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the file wasn't deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file wasn't deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    }];
 }
 
 - (void)testUploadFailedServerDownNonJsonResponseInstanceClient {
     id mock = [self uploadTestHelperWithDataInstanceClient:@{} andStatusCode:500];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the file wasn't deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file wasn't deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"There should be one files after a successful upload.");
+    }];
 }
 
 - (void)testUploadFailedBadRequest {
-    id mock = [self uploadTestHelperWithData:[self buildResponseJsonWithSuccess:NO 
+    id mock = [self uploadTestHelperWithData:[self buildResponseJsonWithSuccess:NO
                                                                    AndErrorCode:@"InvalidCollectionNameError" 
                                                                  AndDescription:@"anything"] 
                                andStatusCode:200];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the file was deleted locally
-    // make sure the event was deleted from the store
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file was deleted locally
+        // make sure the event was deleted from the store
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
+    }];
 }
 
 - (void)testUploadFailedBadRequestInstanceClient {
@@ -505,29 +488,29 @@
                                                                  AndDescription:@"anything"]
                                andStatusCode:200];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the file was deleted locally
-    // make sure the event was deleted from the store
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file was deleted locally
+        // make sure the event was deleted from the store
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"An invalid event should be deleted after an upload attempt.");
+    }];
 }
 
 - (void)testUploadFailedBadRequestUnknownError {
     id mock = [self uploadTestHelperWithData:@{} andStatusCode:400];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the file wasn't deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file wasn't deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
+    }];
 }
 
 - (void)testUploadFailedBadRequestUnknownErrorInstanceClient {
     id mock = [self uploadTestHelperWithDataInstanceClient:@{} andStatusCode:400];
     
-    [self addSimpleEventAndUploadWithMock:mock];
-    
-    // make sure the file wasn't deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
+    [self addSimpleEventAndUploadWithMock:mock andExpect:^{
+        // make sure the file wasn't deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1, @"An upload that results in an unexpected error should not delete the event.");
+    }];
 }
 
 - (void)testUploadMultipleEventsSameCollectionSuccess {
@@ -538,18 +521,18 @@
                                             andErrorCode:nil 
                                           andDescription:nil];
     NSDictionary *result = [NSDictionary dictionaryWithObject:[NSArray arrayWithObjects:result1, result2, nil]
-                                                       forKey:@"foo"];
+                                                       forKey:@"receipts"];
     id mock = [self uploadTestHelperWithData:result andStatusCode:200];
     
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
     
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-    
-    // make sure the events were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the events were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
+    }];
 }
 
 - (void)testUploadMultipleEventsSameCollectionSuccessInstanceClient {
@@ -560,18 +543,18 @@
                                             andErrorCode:nil
                                           andDescription:nil];
     NSDictionary *result = [NSDictionary dictionaryWithObject:[NSArray arrayWithObjects:result1, result2, nil]
-                                                       forKey:@"foo"];
+                                                       forKey:@"receipts"];
     id mock = [self uploadTestHelperWithDataInstanceClient:result andStatusCode:200];
     
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
     
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-    
-    // make sure the events were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the events were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no files after a successful upload.");
+    }];
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionSuccess {
@@ -582,42 +565,38 @@
                                             andErrorCode:nil 
                                           andDescription:nil];
     NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObject:result1], @"foo", 
-                            [NSArray arrayWithObject:result2], @"bar", nil];
+                            [NSArray arrayWithObjects:result1, nil], @"receipts",
+                            [NSArray arrayWithObject:result2], @"server_return_extra_key", nil];
     id mock = [self uploadTestHelperWithData:result andStatusCode:200];
     
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"foo2.bar2" error:nil];
     
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-    
-    // make sure the files were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the files were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    }];
 }
 
 - (void)testUploadMultipleEventsDifferentCollectionSuccessInstanceClient {
     NSDictionary *result1 = [self buildResultWithSuccess:YES
                                             andErrorCode:nil
                                           andDescription:nil];
-    NSDictionary *result2 = [self buildResultWithSuccess:YES
-                                            andErrorCode:nil
-                                          andDescription:nil];
     NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObject:result1], @"foo",
-                            [NSArray arrayWithObject:result2], @"bar", nil];
+                            [NSArray arrayWithObjects:result1, nil], @"receipts", nil];
     id mock = [self uploadTestHelperWithDataInstanceClient:result andStatusCode:200];
     
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo1.bar1" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"foo2.bar2" error:nil];
     
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-    
-    // make sure the files were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the files were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    }];
 }
 
 - (void)testUploadMultipleEventsSameCollectionOneFails {
@@ -628,18 +607,18 @@
                                             andErrorCode:@"InvalidCollectionNameError"
                                           andDescription:@"something"];
     NSDictionary *result = [NSDictionary dictionaryWithObject:[NSArray arrayWithObjects:result1, result2, nil]
-                                                       forKey:@"foo"];
+                                                       forKey:@"receipts"];
     id mock = [self uploadTestHelperWithData:result andStatusCode:200];
 
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
 
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-
-    // make sure the file were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the file were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    }];
 }
 
 - (void)testUploadMultipleEventsSameCollectionOneFailsInstanceClient {
@@ -650,110 +629,56 @@
                                             andErrorCode:@"InvalidCollectionNameError"
                                           andDescription:@"something"];
     NSDictionary *result = [NSDictionary dictionaryWithObject:[NSArray arrayWithObjects:result1, result2, nil]
-                                                       forKey:@"foo"];
+                                                       forKey:@"receipts"];
     id mock = [self uploadTestHelperWithDataInstanceClient:result andStatusCode:200];
     
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple2" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
     
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-    
-    // make sure the file were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the file were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    }];
 }
 
-- (void)testUploadMultipleEventsDifferentCollectionsOneFails {
-    NSDictionary *result1 = [self buildResultWithSuccess:YES
-                                            andErrorCode:nil
-                                          andDescription:nil];
-    NSDictionary *result2 = [self buildResultWithSuccess:NO
+- (void)testUploadMultipleEventsDifferentCollectionsAndFails {
+    NSDictionary *result1 = [self buildResultWithSuccess:NO
                                             andErrorCode:@"InvalidCollectionNameError"
                                           andDescription:@"something"];
     NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObject:result1], @"foo",
-                            [NSArray arrayWithObject:result2], @"bar", nil];
+                            [NSArray arrayWithObject:result1], @"receipts", nil];
     id mock = [self uploadTestHelperWithData:result andStatusCode:200];
 
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo1.bar1" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"foo2.bar2" error:nil];
 
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-
-    // make sure the files were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the files were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
+    }];
 }
 
-- (void)testUploadMultipleEventsDifferentCollectionsOneFailsInstanceClient {
-    NSDictionary *result1 = [self buildResultWithSuccess:YES
-                                            andErrorCode:nil
-                                          andDescription:nil];
-    NSDictionary *result2 = [self buildResultWithSuccess:NO
-                                            andErrorCode:@"InvalidCollectionNameError"
-                                          andDescription:@"something"];
-    NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObject:result1], @"foo",
-                            [NSArray arrayWithObject:result2], @"bar", nil];
-    id mock = [self uploadTestHelperWithDataInstanceClient:result andStatusCode:200];
-    
-    // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"bar" error:nil];
-    
-    // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-    
-    // make sure the files were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 0,  @"There should be no events after a successful upload.");
-}
-
-- (void)testUploadMultipleEventsDifferentCollectionsOneFailsForServerReason {
-    NSDictionary *result1 = [self buildResultWithSuccess:YES
-                                            andErrorCode:nil
-                                          andDescription:nil];
-    NSDictionary *result2 = [self buildResultWithSuccess:NO
+- (void)testUploadMultipleEventsDifferentCollectionsAndFailsForServerReason {
+    NSDictionary *result1 = [self buildResultWithSuccess:NO
                                             andErrorCode:@"barf"
                                           andDescription:@"something"];
     NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObject:result1], @"foo",
-                            [NSArray arrayWithObject:result2], @"bar", nil];
+                            [NSArray arrayWithObjects:result1, nil], @"receipts", nil];
     id mock = [self uploadTestHelperWithData:result andStatusCode:200];
 
     // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo1.bar1" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"foo2.bar2" error:nil];
 
     // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-
-    // make sure the files were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1,  @"There should be 1 events after a partial upload.");
-}
-
-- (void)testUploadMultipleEventsDifferentCollectionsOneFailsForServerReasonInstanceClient {
-    NSDictionary *result1 = [self buildResultWithSuccess:YES
-                                            andErrorCode:nil
-                                          andDescription:nil];
-    NSDictionary *result2 = [self buildResultWithSuccess:NO
-                                            andErrorCode:@"barf"
-                                          andDescription:@"something"];
-    NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObject:result1], @"foo",
-                            [NSArray arrayWithObject:result2], @"bar", nil];
-    id mock = [self uploadTestHelperWithDataInstanceClient:result andStatusCode:200];
-    
-    // add an event
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo" error:nil];
-    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"bar" error:nil];
-    
-    // and "upload" it
-    [mock uploadWithFinishedBlock:nil];
-    
-    // make sure the files were deleted locally
-    XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1,  @"There should be 1 events after a partial upload.");
+    [self uploadWithMock:mock andExpect:^{
+        // make sure the files were deleted locally
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 2,  @"There should be 1 events after a partial upload.");
+    }];
 }
 
 - (void)testTooManyEventsCached {
@@ -810,18 +735,18 @@
     };
     
     // a nil dictionary should be okay
-    RunTest(nil, 1);
+    RunTest(nil, 0);
     
     // an empty dictionary should be okay
-    RunTest(@{}, 1);
+    RunTest(@{}, 0);
     
     // a dictionary that returns some non-conflicting property names should be okay
-    NSDictionary *storedEvent = RunTest(@{@"default_name": @"default_value"}, 2);
+    NSDictionary *storedEvent = RunTest(@{@"default_name": @"default_value"}, 1);
     XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a dictionary that returns a conflicting property name should not overwrite the property on
     // the event
-    RunTest(@{@"foo": @"some_new_value"}, 1);
+    RunTest(@{@"foo": @"some_new_value"}, 0);
     
     // a dictionary that contains an addon should be okay
     NSDictionary *theEvent = @{
@@ -865,18 +790,18 @@
     };
     
     // a nil dictionary should be okay
-    RunTest(nil, 1);
+    RunTest(nil, 0);
     
     // an empty dictionary should be okay
-    RunTest(@{}, 1);
+    RunTest(@{}, 0);
     
     // a dictionary that returns some non-conflicting property names should be okay
-    NSDictionary *storedEvent = RunTest(@{@"default_name": @"default_value"}, 2);
+    NSDictionary *storedEvent = RunTest(@{@"default_name": @"default_value"}, 1);
     XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a dictionary that returns a conflicting property name should not overwrite the property on
     // the event
-    RunTest(@{@"foo": @"some_new_value"}, 1);
+    RunTest(@{@"foo": @"some_new_value"}, 0);
     
     // a dictionary that contains an addon should be okay
     NSDictionary *theEvent = @{
@@ -921,23 +846,23 @@
     };
     
     // a block that returns nil should be okay
-    RunTest(nil, 1);
+    RunTest(nil, 0);
     
     // a block that returns an empty dictionary should be okay
     RunTest(^NSDictionary *(NSString *eventCollection) {
         return [NSDictionary dictionary];
-    }, 1);
+    }, 0);
     
     // a block that returns some non-conflicting property names should be okay
     NSDictionary *storedEvent = RunTest(^NSDictionary *(NSString *eventCollection) {
         return @{@"default_name": @"default_value"};
-    }, 2);
+    }, 1);
     XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a block that returns a conflicting property name should not overwrite the property on the event
     RunTest(^NSDictionary *(NSString *eventCollection) {
         return @{@"foo": @"some new value"};
-    }, 1);
+    }, 0);
     
     // a dictionary that contains an addon should be okay
     NSDictionary *theEvent = @{
@@ -984,23 +909,23 @@
     };
     
     // a block that returns nil should be okay
-    RunTest(nil, 1);
+    RunTest(nil, 0);
     
     // a block that returns an empty dictionary should be okay
     RunTest(^NSDictionary *(NSString *eventCollection) {
         return [NSDictionary dictionary];
-    }, 1);
+    }, 0);
     
     // a block that returns some non-conflicting property names should be okay
     NSDictionary *storedEvent = RunTest(^NSDictionary *(NSString *eventCollection) {
         return @{@"default_name": @"default_value"};
-    }, 2);
+    }, 1);
     XCTAssertEqualObjects(@"default_value", storedEvent[@"default_name"], @"");
     
     // a block that returns a conflicting property name should not overwrite the property on the event
     RunTest(^NSDictionary *(NSString *eventCollection) {
         return @{@"foo": @"some new value"};
-    }, 1);
+    }, 0);
     
     // a dictionary that contains an addon should be okay
     NSDictionary *theEvent = @{
@@ -1044,7 +969,7 @@
 
     XCTAssertEqualObjects(@"bar", storedEvent[@"foo"], @"");
     XCTAssertEqualObjects(@6, storedEvent[@"default_property"], @"");
-    XCTAssertTrue([storedEvent count] == 3, @"");
+    XCTAssertTrue([storedEvent count] == 2, @"");
 }
 
 - (void)testGlobalPropertiesTogetherInstanceClient {
@@ -1069,7 +994,7 @@
     
     XCTAssertEqualObjects(@"bar", storedEvent[@"foo"], @"");
     XCTAssertEqualObjects(@6, storedEvent[@"default_property"], @"");
-    XCTAssertTrue([storedEvent count] == 3, @"");
+    XCTAssertTrue([storedEvent count] == 2, @"");
 }
 
 - (void)testInvalidEventCollection {
