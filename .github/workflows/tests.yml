@@ -11,7 +11,7 @@ jobs:
           - xcode: "14.1"
             ios: "16.1"
             device: "iPhone 14"
-          - xcode: "14.1"
+          - xcode: "13.4.1"
             ios: "15.5"
             device: "iPhone 13"
     name: Test iOS (${{ matrix.ios }})
