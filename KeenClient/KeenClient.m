@@ -657,6 +657,52 @@ static KIOEventStore *eventStore;
     }
 }
 
+// Best effort migrations
+- (Boolean)migrateDBToSupportIngest {
+    NSDictionary *events = [eventStore getEvents];
+    [eventStore deleteAllEvents];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setBool:true forKey:@"keenClientMigrateDBToSupportIngest"];
+    [defaults synchronize];
+    
+    NSError *error;
+    for (NSString *collectionName in events) {
+        NSDictionary *collEvents = [events objectForKey:collectionName];
+        for (NSNumber *eid in collEvents) {
+            NSData *ev = [collEvents objectForKey:eid];
+            NSDictionary *eventDict = [NSJSONSerialization JSONObjectWithData:ev
+                                                                      options:0
+                                                                        error:&error];
+            if (error) {
+                KCLog(@"An error occurred when deserializing a saved event while migrating: %@", [error localizedDescription]);
+                continue;
+            }
+            
+            NSMutableDictionary *mutableEventDict = [NSMutableDictionary dictionaryWithDictionary:eventDict];
+            NSString* uuid = mutableEventDict[@"#UUID"];
+            [mutableEventDict removeObjectsForKeys:@[@"keen", @"#UUID", @"#SSUT"]];
+            if ([mutableEventDict count] == 0) {
+                continue; // Do not add empty events
+            }
+            
+            if (uuid != nil) {
+                mutableEventDict[@"uuid"] = uuid;
+            }
+            
+            NSData *migratedEventData = [NSJSONSerialization dataWithJSONObject:mutableEventDict options:0 error:&error];
+            
+            if (error) {
+                KCLog(@"An error occurred when deserializing a saved event while migrating: %@", [error localizedDescription]);
+                continue;
+            }
+            
+            [eventStore addEvent:migratedEventData collection:collectionName];
+        }
+    }
+    
+    return error ? false : true;
+}
+
 - (NSString *)cacheDirectory {
     NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
     NSString *documentsDirectory = [paths objectAtIndex:0];
@@ -727,6 +773,12 @@ static KIOEventStore *eventStore;
             // event storage into newer SQL-lite based storage.
             [self importFileData];
         }
+        if (![defaults boolForKey:@"keenClientMigrateDBToSupportIngest"]) {
+            if (![self migrateDBToSupportIngest]) {
+                KCLog(@"Failed to migrated to support Ingest");
+            }
+        }
+        
         // get data for the API request we'll make
         NSDictionary *events = [eventStore getEvents];
         if (events.count == 0 && onSuccess) {

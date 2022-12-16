@@ -27,6 +27,7 @@
 - (void)sendEvents:(NSData *)data database:(NSString *)database table:(NSString *)table completionHandler:(void (^)(NSData *data, NSURLResponse *response, NSError *error))completionHandler;
 - (id)convertDate: (id) date;
 - (id)handleInvalidJSONInObject:(id)value;
+- (Boolean)migrateDBToSupportIngest;
 
 @end
 
@@ -1089,6 +1090,61 @@
 
     XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 3,  @"There should be 3 events after an import.");
     XCTAssertFalse([manager fileExistsAtPath:[self keenDirectory] isDirectory:true], @"The Keen directory should be gone.");
+}
+
+- (NSDictionary *)getEventOfCollection:(NSString *)collectionName atIndex:(NSInteger)index {
+    NSDictionary *eventsForCollection = [[[KeenClient getEventStore] getEvents] objectForKey:collectionName];
+    NSData *eventData = [eventsForCollection objectForKey:[[eventsForCollection allKeys] objectAtIndex:index]];
+    NSError *error = nil;
+    NSDictionary *event = [NSJSONSerialization JSONObjectWithData:eventData options:0 error:&error];
+    return event;
+}
+
+- (void)testMigrateDBToSupportIngest {
+    KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
+    client.isRunningTests = YES;
+    
+    NSDictionary *event10 = @{@"key": @"value"};
+    NSDictionary *event11 = @{@"key": @"value", @"keen": @{@"time": @12324567890}, @"#SSUT": @"test-ssut"};
+    NSDictionary *event20 = @{@"nested": @{@"keen": @"whatever"}, @"keen": @{@"time": @22324567890}, @"#UUID": @"test-uuid", @"#SSUT": @"test-ssut2"};
+    NSDictionary *event21 = @{@"nested": @{@"keen": @"whatever"}, @"#UUID": @"test-uuid"};
+    NSDictionary *event30 = @{@"key": @"value", @"key2": @"value2", @"keen": @{@"time": @22324567890}, @"#UUID": @"test-uuid", @"#SSUT": @"test-ssut3"};
+    
+    [client addEvent:event11 toEventCollection:@"foo1.bar1" error:nil];
+    [client addEvent:event10 toEventCollection:@"foo1.bar1" error:nil];
+    [client addEvent:event21 toEventCollection:@"foo2.bar2" error:nil];
+    [client addEvent:event20 toEventCollection:@"foo2.bar2" error:nil];
+    [client addEvent:event30 toEventCollection:@"foo3.bar3" error:nil];
+    Boolean success = [client migrateDBToSupportIngest];
+    
+    XCTAssertTrue(success, @"migrateToVersion1 should returns true");
+    XCTAssertEqual([[KeenClient getEventStore] getTotalEventCount], 5);
+
+    NSDictionary *expect1 = @{@"key": @"value"};
+    XCTAssertEqualObjects([self getEventOfCollection:@"foo1.bar1" atIndex:0], expect1);
+    XCTAssertEqualObjects([self getEventOfCollection:@"foo1.bar1" atIndex:1], expect1);
+    NSDictionary *expect2 = @{@"nested": @{@"keen": @"whatever"}, @"uuid": @"test-uuid"};
+    XCTAssertEqualObjects([self getEventOfCollection:@"foo2.bar2" atIndex:0], expect2);
+    XCTAssertEqualObjects([self getEventOfCollection:@"foo2.bar2" atIndex:1], expect2);
+    NSDictionary *expect3 = @{@"key": @"value", @"key2": @"value2", @"uuid": @"test-uuid"};
+    XCTAssertEqualObjects([self getEventOfCollection:@"foo3.bar3" atIndex:0], expect3);
+}
+
+- (void)testMigrateDBToSupportIngestWithEmptyEvents {
+    KeenClient *client = [KeenClient sharedClientWithProjectId:@"id" andWriteKey:@"wk" andReadKey:@"rk"];
+    client.isRunningTests = YES;
+    
+    NSDictionary *event00 = @{}; // Empty event will be removed
+    NSDictionary *event01 = @{@"keen": @{@"time": @12324567890}, @"#UUID": @"test-uuid", @"#SSUT": @"test-ssut"}; // Empty event will be removed
+    NSDictionary *event02 = @{@"key": @"value"}; // Only this event will be migrated
+    
+    [client addEvent:event00 toEventCollection:@"foo0.bar0" error:nil];
+    [client addEvent:event01 toEventCollection:@"foo0.bar0" error:nil];
+    [client addEvent:event02 toEventCollection:@"foo0.bar0" error:nil];
+    Boolean success = [client migrateDBToSupportIngest];
+
+    XCTAssertTrue(success, @"migrateToVersion1 should returns true");
+    XCTAssertEqual([[KeenClient getEventStore] getTotalEventCount], 1);
 }
 
 - (void)testMigrateFSEventsInstanceClient {
