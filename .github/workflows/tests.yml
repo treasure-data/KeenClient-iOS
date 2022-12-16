@@ -18,6 +18,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Select Xcode
-      run: sudo xcode-select -switch /Applications/Xcode_$.app && /usr/bin/xcodebuild -version
+      run: sudo xcode-select -switch /Applications/Xcode_${{matrix.xcode}}.app && /usr/bin/xcodebuild -version
     - name: Run unit tests
-      run: xcodebuild test -scheme KeenClient -project KeenClient.xcodeproj -destination 'platform=iOS Simulator,name=${{matrix.device}},OS=$' | xcpretty && exit ${PIPESTATUS[0]}
+      run: xcodebuild test -scheme KeenClient -project KeenClient.xcodeproj -destination 'platform=iOS Simulator,name=${{matrix.device}},OS=${{matrix.xcode}}' | xcpretty && exit ${PIPESTATUS[0]}
