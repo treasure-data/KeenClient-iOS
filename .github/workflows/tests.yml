@@ -1,0 +1,23 @@
+name: tests
+
+on: [push]
+
+jobs:
+  run_tests:
+    runs-on: macos-12
+    strategy:
+      matrix:
+        include:
+          - xcode: "14.1"
+            ios: "16.1"
+            device: "iPhone 14"
+          - xcode: "13.4.1"
+            ios: "15.5"
+            device: "iPhone 13"
+    name: Test iOS (${{ matrix.ios }})
+    steps:
+    - uses: actions/checkout@v2
+    - name: Select Xcode
+      run: sudo xcode-select -switch /Applications/Xcode_${{matrix.xcode}}.app && /usr/bin/xcodebuild -version
+    - name: Run unit tests
+      run: xcodebuild test -scheme KeenClient -project KeenClient.xcodeproj -destination 'platform=iOS Simulator,name=${{matrix.device}},OS=${{matrix.ios}}' | xcpretty && exit ${PIPESTATUS[0]}
