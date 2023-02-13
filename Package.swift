@@ -5,9 +5,8 @@ import PackageDescription
 let package = Package(
     name: "KeenClientTD",
     platforms: [
-        .macOS(.v10_10),
-        .iOS(.v11),
-        .tvOS(.v9),
+        .iOS(.v12),
+        .tvOS(.v12),
     ],
     products: [
         .library(
