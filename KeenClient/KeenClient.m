@@ -1074,7 +1074,7 @@ static KIOEventStore *eventStore;
     if (self.isRunningTests) {
         return 2;
     }
-    return 500;
+    return 400;
 }
 
 - (NSUInteger)maxEventsPerCollection {
