@@ -105,12 +105,6 @@ static KIOEventStore *eventStore;
 - (NSString *)pathForEventInCollection:(NSString *)collection
                          WithTimestamp:(NSDate *)timestamp;
 
-- (void)handleAPIResponse:(NSURLResponse *)response
-                  andData:(NSData *)responseData
-                forEvents:(NSDictionary *)eventIds
-                onSuccess:(void (^)(void))onSuccess
-                  onError:(void (^)(NSString*, NSString*))onError;
-
 /**
  Converts an NSDate* instance into a correctly formatted ISO-8601 compatible string.
  @param date The NSData* instance to convert.
@@ -800,6 +794,9 @@ static KIOEventStore *eventStore;
 
 # pragma mark - Uploading
 
+/**
+ * Upload the all collections. Each collection will be uploaded to a separate endpoint.
+ */
 - (void)upload:(void (^)(void))onSuccess onError:(void (^)(NSString*, NSString*))onError {
     // only one thread should be doing an upload at a time.
     @synchronized (self) {
@@ -821,29 +818,39 @@ static KIOEventStore *eventStore;
         NSDictionary *events = [eventStore getEvents];
         if (events.count == 0 && onSuccess) {
             onSuccess();
+            return;
         }
         
         __block NSMutableSet *finishedUpload = [NSMutableSet new];
+        __block NSError *finalError = nil;
         NSUInteger totalNumberOfCollections = events.count;
-        void (^handleOnSuccess)(NSString *) = ^(NSString *cName) {
+        void (^handler)(NSString *, NSError *) = ^(NSString *cName, NSError *error) {
             @synchronized (finishedUpload) {
-                if (finishedUpload == nil || onSuccess == nil) return;
+                if (finishedUpload == nil || (onSuccess == nil && onError == nil)) return;
                 [finishedUpload addObject:cName];
+                if (error) finalError = error;
+//                NSLog(@"%lu collections finishedUpload: %@. Error: %@", totalNumberOfCollections, finishedUpload, finalError);
                 if (finishedUpload.count == totalNumberOfCollections) {
-                    NSLog(@"%lu collections finishedUpload: %@", totalNumberOfCollections, finishedUpload);
-                    onSuccess();
+                    if (finalError) {
+                        if (onError) onError(finalError.userInfo[@"code"], finalError.localizedDescription);
+                    } else {
+                        if (onSuccess) onSuccess();
+                    }
                 }
             }
         };
 
+
         for (NSString *collectionName in events) {
-            [self uploadCollection:collectionName inEvents:events onSuccess:handleOnSuccess onError:onError];
+            [self uploadCollection:collectionName inEvents:events completionHandler:handler];
         }
     }
 }
 
-- (void)uploadCollection:(NSString*)collectionName inEvents:(NSDictionary *)events onSuccess:
-(void (^)(NSString *))onSuccess onError:(void (^)(NSString*, NSString*))onError {
+/**
+ * Upload the entire collections split by chunks of size maxUploadEventsAtOnce
+ */
+- (void)uploadCollection:(NSString*)collectionName inEvents:(NSDictionary *)events completionHandler:(void (^)(NSString *, NSError *))completionHandler {
     NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
     if ([collNameComps count] != 2) {
         return;
@@ -854,14 +861,16 @@ static KIOEventStore *eventStore;
     NSArray *eventsChunks = [self eventsFromCollection:collectionName eventsData:collectionEventsDict chunkSize:self.maxUploadEventsAtOnce];
     
     __block NSMutableSet *finishedUpload = [NSMutableSet new];
+    __block NSError *finalError = nil;
     NSUInteger totalNumberOfChunks = eventsChunks.count;
-    void (^handleOnSuccess)(NSNumber *) = ^(NSNumber *chunkIndex) {
+    void (^handler)(NSNumber *, NSError *error) = ^(NSNumber *chunkIndex, NSError *error) {
         @synchronized (finishedUpload) {
-            if (finishedUpload == nil || onSuccess == nil) return;
+            if (finishedUpload == nil || (completionHandler == nil)) return;
             [finishedUpload addObject:chunkIndex];
+            if (error) finalError = error;
+//            NSLog(@"%lu chunks finishedUpload: %@. Error: %@", totalNumberOfChunks, finishedUpload, finalError);
             if (finishedUpload.count == totalNumberOfChunks) {
-                NSLog(@"%lu chunks finishedUpload: %@", totalNumberOfChunks, finishedUpload);
-                onSuccess(collectionName);
+                completionHandler(collectionName, finalError);
             }
         }
     };
@@ -874,38 +883,42 @@ static KIOEventStore *eventStore;
         NSData *requestData = [self ingestRequestDataForEvents:chunkEvents error:&error];
         
         if (error) {
-            KCLog(@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]);
-            if (onError) {
-                onError(ERROR_CODE_DATA_CONVERSION, [NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]);
-            }
+            NSString *localizedDescription =  [NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]];
+            KCLog(@"%@", localizedDescription);
+            handler(@(idx), [NSError errorWithDomain:kKeenErrorDomain code:0 userInfo: @{
+                @"code": ERROR_CODE_DATA_CONVERSION,
+                NSLocalizedDescriptionKey: localizedDescription
+            }]);
             return;
         }
         
         [self uploadEventData:requestData
                 forCollection:collectionName
                   andEventIds:chunkEventIds
-                    onSuccess:^{ handleOnSuccess(@(idx)); }
-                      onError:onError];
+                    onSuccess:^{ handler(@(idx), nil); }
+                      onError:^(NSError *error) { handler(@(idx), error); }];
     }];
 }
 
+/**
+ * Send a list of events that belongs to collectionName.
+ */
 -(void)uploadEventData:(NSData *)requestData
          forCollection:(NSString *)collectionName
            andEventIds:(NSArray *)eventIds
              onSuccess:(void (^)(void))onSuccess
-               onError:(void (^)(NSString*, NSString*))onError {
+               onError:(void (^)(NSError*))onError {
     NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
     if ([collNameComps count] != 2) { return; }
     
     if ([requestData length] > 0) {
-        
-        // then make an http request to the keen server.
+        // Make a http request to the keen server.
         [self sendEvents:requestData
                 database:collNameComps[0]
                    table:collNameComps[1]
        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
             
-            // then parse the http response and deal with it appropriately
+            // Parse the http response and deal with it appropriately
             [self handleIngestAPIResponse:response
                                   andData:data
                             forCollection:collectionName
@@ -925,15 +938,17 @@ static KIOEventStore *eventStore;
                   forCollection:(NSString *)collectionName
                     andEventIds:(NSArray *)eventIds
                       onSuccess:(void (^)(NSString*))onSuccess
-                        onError:(void (^)(NSString*, NSString*))onError {
+                        onError:(void (^)(NSError *))onError {
     if (!responseData) {
         KCLog(@"responseData was nil for some reason.  That's not great.");
         KCLog(@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]);
         
         NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
         if (onError) {
-            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
-                    [NSString stringWithFormat:@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]]);
+            onError([NSError errorWithDomain:kKeenErrorDomain code:0 userInfo:@{
+                @"code": responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
+                NSLocalizedDescriptionKey: [NSString stringWithFormat:@"response status code: %ld", responseCode]
+            }]);
         }
         return;
     }
@@ -947,11 +962,13 @@ static KIOEventStore *eventStore;
                                                                        error:&error];
         if (error) {
             NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
-            KCLog(@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString);
+            NSString *localizedDescription = [NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString];
+            KCLog(@"%@", localizedDescription);
             if (onError) {
-                onError(ERROR_CODE_DATA_CONVERSION,
-                        [NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@",
-                            [error localizedDescription], responseString]);
+                onError([NSError errorWithDomain:kKeenErrorDomain code:0 userInfo:@{
+                    @"code": ERROR_CODE_DATA_CONVERSION,
+                    NSLocalizedDescriptionKey: localizedDescription
+                }]);
             }
             return;
         }
@@ -991,98 +1008,16 @@ static KIOEventStore *eventStore;
             onSuccess(collectionName);
         }
     } else {
-        // response code was NOT 200, which means something else happened. log this.
-        KCLog(@"Response code was NOT 200. It was: %ld", (long)responseCode);
         NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
+        NSString *localizedDescription = [NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode];
+        // response code was NOT 200, which means something else happened. log this.
+        KCLog(@"%@", localizedDescription);
         KCLog(@"Response body was: %@", responseString);
         if (onError) {
-            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
-                    [NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode]);
-        }
-    }
-}
-
-- (void)handleAPIResponse:(NSURLResponse *)response 
-                  andData:(NSData *)responseData
-                forEvents:(NSDictionary *)eventIds
-                onSuccess:(void (^)(void))onSuccess
-                  onError:(void (^)(NSString*, NSString*))onError {
-    if (!responseData) {
-        KCLog(@"responseData was nil for some reason.  That's not great.");
-        KCLog(@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]);
-        
-        NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
-        if (onError) {
-            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
-                    [NSString stringWithFormat:@"response status code: %ld", (long)[((NSHTTPURLResponse *) response) statusCode]]);
-        }
-        return;
-    }
-    NSInteger responseCode = [((NSHTTPURLResponse *)response) statusCode];
-    // if the request succeeded, dig into the response to figure out which events succeeded and which failed
-    if (responseCode == 200) {
-        // deserialize the response
-        NSError *error = nil;
-        NSDictionary *responseDict = [NSJSONSerialization JSONObjectWithData:responseData
-                                                                     options:0
-                                                                       error:&error];
-        if (error) {
-            NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
-            KCLog(@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@", [error localizedDescription], responseString);
-            if (onError) {
-                onError(ERROR_CODE_DATA_CONVERSION,
-                        [NSString stringWithFormat:@"An error occurred when deserializing HTTP response JSON into dictionary.\nError: %@\nResponse: %@",
-                            [error localizedDescription], responseString]);
-            }
-            return;
-        }
-        // now iterate through the keys of the response, which represent collection names
-        NSArray *collectionNames = [responseDict allKeys];
-        for (NSString *collectionName in collectionNames) {
-            // grab the results for this collection
-            NSArray *results = [responseDict objectForKey:collectionName];
-            // go through and delete any successes and failures because of user error
-            // (making sure to keep any failures due to server error)
-            NSUInteger count = 0;
-            for (NSDictionary *result in results) {
-                Boolean deleteFile = YES;
-                Boolean success = [[result objectForKey:kKeenSuccessParam] boolValue];
-                if (!success) {
-                    // grab error code and description
-                    NSDictionary *errorDict = [result objectForKey:kKeenErrorParam];
-                    NSString *errorCode = [errorDict objectForKey:kKeenNameParam];
-                    if ([errorCode isEqualToString:kKeenInvalidCollectionNameError] ||
-                        [errorCode isEqualToString:kKeenInvalidPropertyNameError] ||
-                        [errorCode isEqualToString:kKeenInvalidPropertyValueError]) {
-                        KCLog(@"An invalid event was found.  Deleting it.  Error: %@", 
-                              [errorDict objectForKey:kKeenDescriptionParam]);
-                        deleteFile = YES;
-                    } else {
-                        KCLog(@"The event could not be inserted for some reason.  Error name and description: %@, %@", 
-                              errorCode, [errorDict objectForKey:kKeenDescriptionParam]);
-                        deleteFile = NO;
-                    }
-                }
-                // delete the file if we need to
-                if (deleteFile) {
-                    NSNumber *eid = [[eventIds objectForKey:collectionName] objectAtIndex:count];
-                    [eventStore deleteEvent: eid];
-                    KCLog(@"Successfully deleted event: %@", eid);
-                }
-                count++;
-            }
-        }
-        if (onSuccess) {
-            onSuccess();
-        }
-    } else {
-        // response code was NOT 200, which means something else happened. log this.
-        KCLog(@"Response code was NOT 200. It was: %ld", (long)responseCode);
-        NSString *responseString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
-        KCLog(@"Response body was: %@", responseString);
-        if (onError) {
-            onError(responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
-                    [NSString stringWithFormat:@"Response code was NOT 200. It was: %ld", (long)responseCode]);
+            onError([NSError errorWithDomain:kKeenErrorDomain code:0 userInfo:@{
+                @"code": responseCode == 0 ? ERROR_CODE_NETWORK_ERROR : ERROR_CODE_SERVER_RESPONSE,
+                NSLocalizedDescriptionKey: localizedDescription
+            }]);
         }
     }
 }

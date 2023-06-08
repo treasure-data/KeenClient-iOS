@@ -603,10 +603,9 @@
     NSDictionary *result2 = [self buildResultWithSuccess:YES
                                             andErrorCode:nil 
                                           andDescription:nil];
-    NSDictionary *result = [NSDictionary dictionaryWithObjectsAndKeys:
-                            [NSArray arrayWithObjects:result1, nil], @"receipts",
-                            [NSArray arrayWithObject:result2], @"server_return_extra_key", nil];
-    id mock = [self uploadTestHelperWithData:result andStatusCode:200];
+    NSDictionary *response1 = @{@"receipts": @[result1]};
+    NSDictionary *response2 = @{@"receipts": @[result2]};
+    id mock = [self uploadTestHelperWithDataSequence:@[response1, response2] andStatusCodes:@[@200, @200]];
     
     // add an event
     [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
@@ -746,8 +745,8 @@
 }
 
 - (void)testMaxUploadEventsAtOnceFailure {
-    NSDictionary *result1 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
-    NSDictionary *result2 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+//    NSDictionary *result1 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+//    NSDictionary *result2 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result3 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result4 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result5 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
@@ -766,7 +765,57 @@
     // and "upload" it
     [self uploadWithMock:mock andExpect:^{
         NSLog(@"getTotalEventCount %lu", [[KeenClient getEventStore] getTotalEventCount]);
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 2,  @"There should be 2 events after request #1 fails upload.");
+    }];
+}
+
+- (void)testMaxUploadEventsAtOncePartialFailureInCollection {
+    NSDictionary *result1 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+    NSDictionary *result2 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+//    NSDictionary *result3 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+//    NSDictionary *result4 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+    NSDictionary *result5 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+    NSDictionary *response1 = @{@"receipts": @[result1, result2]};
+    NSDictionary *response2 = @{};
+    NSDictionary *response3 = @{@"receipts": @[result5]};
+    id mock = [self uploadTestHelperWithDataSequence:@[response1, response2, response3] andStatusCodes:@[@200, @500, @200]];
+    
+    // add an event
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"orange" forKey:@"a"] toEventCollection:@"foo2.bar2" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"borange" forKey:@"b"] toEventCollection:@"foo2.bar2" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"corange" forKey:@"c"] toEventCollection:@"foo2.bar2" error:nil];
+    
+    // and "upload" it
+    [self uploadWithMock:mock andExpect:^{
+        NSLog(@"getTotalEventCount %lu", [[KeenClient getEventStore] getTotalEventCount]);
         XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 2,  @"There should be 2 events after request #2 fails upload.");
+    }];
+}
+
+- (void)testMaxUploadEventsAtOncePartialFailureInRequest {
+    NSDictionary *result1 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+    NSDictionary *result2 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+    NSDictionary *result3 = [self buildResultWithSuccess:NO andErrorCode:nil andDescription:nil];
+    NSDictionary *result4 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+    NSDictionary *result5 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
+    NSDictionary *response1 = @{@"receipts": @[result1, result2]};
+    NSDictionary *response2 = @{@"receipts": @[result3, result4]};
+    NSDictionary *response3 = @{@"receipts": @[result5]};
+    id mock = [self uploadTestHelperWithDataSequence:@[response1, response2, response3] andStatusCodes:@[@200, @200, @200]];
+    
+    // add an event
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"apple" forKey:@"a"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"bapple" forKey:@"b"] toEventCollection:@"foo.bar" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"orange" forKey:@"a"] toEventCollection:@"foo2.bar2" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"borange" forKey:@"b"] toEventCollection:@"foo2.bar2" error:nil];
+    [mock addEvent:[NSDictionary dictionaryWithObject:@"corange" forKey:@"c"] toEventCollection:@"foo2.bar2" error:nil];
+    
+    // and "upload" it
+    [self uploadWithMock:mock andExpect:^{
+        NSLog(@"getTotalEventCount %lu", [[KeenClient getEventStore] getTotalEventCount]);
+        XCTAssertTrue([[KeenClient getEventStore] getTotalEventCount] == 1,  @"There should be 1 events after request #2 fails upload.");
     }];
 }
 
