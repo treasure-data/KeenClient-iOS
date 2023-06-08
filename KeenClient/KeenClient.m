@@ -29,6 +29,9 @@ static KIOEventStore *eventStore;
 // How many times the previous timestamp has been used.
 @property (nonatomic) NSInteger numTimesTimestampUsed;
 
+// The max number of events per request.
+@property (nonatomic, readonly) NSUInteger maxUploadEventsAtOnce;
+
 // The max number of events per collection.
 @property (nonatomic, readonly) NSUInteger maxEventsPerCollection;
 
@@ -148,7 +151,7 @@ static KIOEventStore *eventStore;
          */
         return;
     }
-
+    
     [KeenClient disableLogging];
 }
 
@@ -179,9 +182,9 @@ static KIOEventStore *eventStore;
     if ([KeenClient isLoggingEnabled]) {
         KCLog(@"KeenClientTD %@", kKeenSdkVersion);
     }
-        
+    
     self.uploadQueue = dispatch_queue_create("com.treasuredata.uploader", DISPATCH_QUEUE_SERIAL);
-
+    
     return self;
 }
 
@@ -224,7 +227,7 @@ static KIOEventStore *eventStore;
             self.readKey = readKey;
         }
     }
-
+    
     return self;
 }
 
@@ -237,13 +240,13 @@ static KIOEventStore *eventStore;
     if (![KeenClient validateProjectId:projectId]) {
         return nil;
     }
-
+    
     if (!eventStore) {
         eventStore = [[KIOEventStore alloc] init];
     }
     sharedClient.projectId = projectId;
     eventStore.projectId = projectId;
-
+    
     if (writeKey) {
         // only validate a non-nil value
         if (![KeenClient validateKey:writeKey]) {
@@ -352,7 +355,7 @@ static KIOEventStore *eventStore;
     if (![KeenClient validateKey:self.writeKey]) {
         [NSException raise:@"KeenNoWriteKeyProvided" format:@"You tried to add an event without setting a write key, please set one!"];
     }
-
+    
     // don't do anything if the event itself or the event collection name are invalid somehow.
     if (![self validateEventCollection:eventCollection error:anError]) {
         if (onError) {
@@ -393,7 +396,7 @@ static KIOEventStore *eventStore;
         KCLog(@"Count: %lu and Max: %lu", (unsigned long)eventCount, (unsigned long)self.maxEventsPerCollection);
         [eventStore deleteEventsFromOffset:[NSNumber numberWithUnsignedInteger: eventCount - self.numberEventsToForget]];
     }
-
+    
     if (!keenProperties) {
         KeenProperties *newProperties = [[KeenProperties alloc] init];
         keenProperties = newProperties;
@@ -404,17 +407,17 @@ static KIOEventStore *eventStore;
     
     // Below code is commented out because we no longer support keen column in new Ingest API
     // either set "keen" only from keen properties or merge in
-//    NSDictionary *originalKeenDict = [eventToWrite objectForKey:@"keen"];
-//    if (originalKeenDict) {
-//        // have to merge
-//        NSMutableDictionary *keenDict = [self handleInvalidJSONInObject:keenProperties];
-//        [keenDict addEntriesFromDictionary:originalKeenDict];
-//        [eventToWrite setObject:keenDict forKey:@"keen"];
-//
-//    } else {
-//        // just set it directly
-//        [eventToWrite setObject:keenProperties forKey:@"keen"];
-//    }
+    //    NSDictionary *originalKeenDict = [eventToWrite objectForKey:@"keen"];
+    //    if (originalKeenDict) {
+    //        // have to merge
+    //        NSMutableDictionary *keenDict = [self handleInvalidJSONInObject:keenProperties];
+    //        [keenDict addEntriesFromDictionary:originalKeenDict];
+    //        [eventToWrite setObject:keenDict forKey:@"keen"];
+    //
+    //    } else {
+    //        // just set it directly
+    //        [eventToWrite setObject:keenProperties forKey:@"keen"];
+    //    }
     
     NSError *error = nil;
     NSData *jsonData = [self serializeEventToJSON:eventToWrite error:&error];
@@ -443,7 +446,7 @@ static KIOEventStore *eventStore;
     if ([KeenClient isLoggingEnabled]) {
         KCLog(@"Event: %@", eventToWrite);
     }
-
+    
     return YES;
 }
 
@@ -563,6 +566,41 @@ static KIOEventStore *eventStore;
     }
 }
 
+-(NSArray *)eventsFromCollection:(NSString *)collectionName eventsData:(NSDictionary *)eventsData chunkSize:(NSUInteger)chunkSize {
+    NSMutableArray *chunks = [NSMutableArray array];
+    
+    // create a separate array for event data so our dictionary serializes properly
+    NSMutableArray *events = [NSMutableArray array];
+    NSMutableArray *eventIds = [NSMutableArray array];
+
+    NSError *error;
+    for (NSNumber *eid in eventsData) {
+        NSData *ev = [eventsData objectForKey:eid];
+        NSDictionary *eventDict = [NSJSONSerialization JSONObjectWithData:ev
+                                                                  options:0
+                                                                    error:&error];
+        if (error) {
+            KCLog(@"An error occurred when deserializing a saved event: %@", [error localizedDescription]);
+            // TODO: consider delete these undeserializable events
+            continue;
+        }
+        
+        [events addObject:eventDict];
+        [eventIds addObject: eid];
+        
+        if (events.count >= chunkSize) {
+            [chunks addObject: @{@"events": events, @"eventIds": eventIds}];
+            events = [NSMutableArray array];
+            eventIds = [NSMutableArray array];
+        }
+    }
+    
+    if (events.count > 0) {
+        [chunks addObject: @{@"events": events, @"eventIds": eventIds}];
+    }
+    
+    return chunks;
+}
 
 -(NSDictionary *)eventsFromCollection:(NSString *)collectionName eventsData:(NSDictionary *)eventsData error:(NSError **)error {
     // create a separate array for event data so our dictionary serializes properly
@@ -600,28 +638,28 @@ static KIOEventStore *eventStore;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults setBool:true forKey:@"didFSImport"];
     [defaults synchronize];
-
+    
     @try {
         // list all the directories under Keen
         NSArray *directories = [self keenSubDirectories];
         NSString *rootPath = [self keenDirectory];
-
+        
         // Get a file manager so we can use it later
         NSFileManager *fileManager = [NSFileManager defaultManager];
-
+        
         // We only need to do this import if the directory exists so check
         // that out first.
         if ([fileManager fileExistsAtPath:rootPath]) {
             // declare an error object
             NSError *error = nil;
-
+            
             // iterate through each directory
             for (NSString *dirName in directories) {
                 KCLog(@"Found directory: %@", dirName);
                 // list contents of each directory
                 NSString *dirPath = [rootPath stringByAppendingPathComponent:dirName];
                 NSArray *files = [self contentsAtPath:dirPath];
-
+                
                 for (NSString *fileName in files) {
                     KCLog(@"Found file: %@/%@", dirName, fileName);
                     NSString *filePath = [dirPath stringByAppendingPathComponent:fileName];
@@ -633,8 +671,8 @@ static KIOEventStore *eventStore;
                         // Attempt to deserialize this just to determine if it's valid
                         // or not. We don't actually care about the results.
                         [NSJSONSerialization JSONObjectWithData:data
-                            options:0
-                            error:&error];
+                                                        options:0
+                                                          error:&error];
                         if (error) {
                             // If we got an error we're not gonna add it
                             KCLog(@"An error occurred when deserializing a saved event: %@", [error localizedDescription]);
@@ -642,7 +680,7 @@ static KIOEventStore *eventStore;
                             // All's well: Add it!
                             [eventStore addEvent:data collection:dirName];
                         }
-
+                        
                     }
                     // Regardless, delete it when we're done.
                     [fileManager removeItemAtPath:filePath error:nil];
@@ -743,12 +781,12 @@ static KIOEventStore *eventStore;
     // start a counter that we'll use to make sure that even if multiple events are written with the same timestamp,
     // we'll be able to handle it.
     uint count = 0;
-
+    
     // declare a tiny helper block to get the next path based on the counter.
     NSString * (^getNextPath)(uint count) = ^(uint count) {
         return [directory stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.%i", name, count]];
     };
-
+    
     // starting with our root filename.0, see if a file exists.  if it doesn't, great.  but if it does, then go
     // on to filename.1, filename.2, etc.
     NSString *path = getNextPath(count);
@@ -756,7 +794,7 @@ static KIOEventStore *eventStore;
         count++;
         path = getNextPath(count);
     }
-
+    
     return path;
 }
 
@@ -785,66 +823,106 @@ static KIOEventStore *eventStore;
             onSuccess();
         }
         
-        NSError *error = nil;
         __block NSMutableSet *finishedUpload = [NSMutableSet new];
-        NSUInteger totalNumbrOfCollections = events.count;
+        NSUInteger totalNumberOfCollections = events.count;
         void (^handleOnSuccess)(NSString *) = ^(NSString *cName) {
             @synchronized (finishedUpload) {
                 if (finishedUpload == nil || onSuccess == nil) return;
                 [finishedUpload addObject:cName];
-                if (finishedUpload.count == totalNumbrOfCollections) {
+                if (finishedUpload.count == totalNumberOfCollections) {
+                    NSLog(@"%lu collections finishedUpload: %@", totalNumberOfCollections, finishedUpload);
                     onSuccess();
                 }
             }
         };
-        
+
         for (NSString *collectionName in events) {
-            NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
-            if ([collNameComps count] != 2) {continue;}
-            
-            NSDictionary *collEvents = [events objectForKey:collectionName];
-            NSDictionary *eventDicts = [self eventsFromCollection:collectionName eventsData:collEvents error:&error];
-            NSArray *events = eventDicts[@"events"];
-            NSArray *eventIds = eventDicts[@"eventIds"];
-            NSData *requestData = [self ingestRequestDataForEvents:events error:&error];
-            
-            if (error) {
-                KCLog(@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]);
-                if (onError) {
-                    onError(ERROR_CODE_DATA_CONVERSION, [NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]);
-                }
-                return;
+            [self uploadCollection:collectionName inEvents:events onSuccess:handleOnSuccess onError:onError];
+        }
+    }
+}
+
+- (void)uploadCollection:(NSString*)collectionName inEvents:(NSDictionary *)events onSuccess:
+(void (^)(NSString *))onSuccess onError:(void (^)(NSString*, NSString*))onError {
+    NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
+    if ([collNameComps count] != 2) {
+        return;
+    }
+    
+    NSDictionary *collectionEventsDict = [events objectForKey:collectionName];
+    
+    NSArray *eventsChunks = [self eventsFromCollection:collectionName eventsData:collectionEventsDict chunkSize:self.maxUploadEventsAtOnce];
+    
+    __block NSMutableSet *finishedUpload = [NSMutableSet new];
+    NSUInteger totalNumberOfChunks = eventsChunks.count;
+    void (^handleOnSuccess)(NSNumber *) = ^(NSNumber *chunkIndex) {
+        @synchronized (finishedUpload) {
+            if (finishedUpload == nil || onSuccess == nil) return;
+            [finishedUpload addObject:chunkIndex];
+            if (finishedUpload.count == totalNumberOfChunks) {
+                NSLog(@"%lu chunks finishedUpload: %@", totalNumberOfChunks, finishedUpload);
+                onSuccess(collectionName);
             }
+        }
+    };
+    
+    [eventsChunks enumerateObjectsUsingBlock:^(NSDictionary*_Nonnull eventsChunk, NSUInteger idx, BOOL * _Nonnull stop) {
+        NSArray *chunkEvents = eventsChunk[@"events"];
+        NSArray *chunkEventIds = eventsChunk[@"eventIds"];
+        
+        NSError *error = nil;
+        NSData *requestData = [self ingestRequestDataForEvents:chunkEvents error:&error];
+        
+        if (error) {
+            KCLog(@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]);
+            if (onError) {
+                onError(ERROR_CODE_DATA_CONVERSION, [NSString stringWithFormat:@"An error occurred when serializing the final request data back to JSON: %@", [error localizedDescription]]);
+            }
+            return;
+        }
+        
+        [self uploadEventData:requestData
+                forCollection:collectionName
+                  andEventIds:chunkEventIds
+                    onSuccess:^{ handleOnSuccess(@(idx)); }
+                      onError:onError];
+    }];
+}
+
+-(void)uploadEventData:(NSData *)requestData
+         forCollection:(NSString *)collectionName
+           andEventIds:(NSArray *)eventIds
+             onSuccess:(void (^)(void))onSuccess
+               onError:(void (^)(NSString*, NSString*))onError {
+    NSArray *collNameComps = [collectionName componentsSeparatedByString:@"."];
+    if ([collNameComps count] != 2) { return; }
+    
+    if ([requestData length] > 0) {
+        
+        // then make an http request to the keen server.
+        [self sendEvents:requestData
+                database:collNameComps[0]
+                   table:collNameComps[1]
+       completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
             
-            if ([requestData length] > 0) {
-                
-                // then make an http request to the keen server.
-                [self sendEvents:requestData
-                        database:collNameComps[0]
-                           table:collNameComps[1]
-               completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-                    // then parse the http response and deal with it appropriately
-                    [self handleIngestAPIResponse:response
-                                          andData:data
-                                forCollectionName:collectionName
-                                      andEventIds:eventIds
-                                        onSuccess:handleOnSuccess
-                                          onError:onError];
-                }];
-            }
-            else {
-                // Callback may be needed even when bufferred data is empty to use the callback as a trigger of something in an application
-                if (onSuccess) {
-                    onSuccess();
-                }
-            }
+            // then parse the http response and deal with it appropriately
+            [self handleIngestAPIResponse:response
+                                  andData:data
+                            forCollection:collectionName
+                              andEventIds:eventIds
+                                onSuccess:^(NSString *cName) { onSuccess(); }
+                                  onError:onError];
+        }];
+    } else {
+        if (onSuccess) {
+            onSuccess();
         }
     }
 }
 
 - (void)handleIngestAPIResponse:(NSURLResponse *)response
                         andData:(NSData *)responseData
-              forCollectionName:(NSString *)collectionName
+                  forCollection:(NSString *)collectionName
                     andEventIds:(NSArray *)eventIds
                       onSuccess:(void (^)(NSString*))onSuccess
                         onError:(void (^)(NSString*, NSString*))onError {
@@ -1056,6 +1134,13 @@ static KIOEventStore *eventStore;
 }
 
 # pragma mark - To make testing easier
+
+- (NSUInteger)maxUploadEventsAtOnce {
+    if (self.isRunningTests) {
+        return 2;
+    }
+    return 500;
+}
 
 - (NSUInteger)maxEventsPerCollection {
     if (self.isRunningTests) {
