@@ -829,7 +829,6 @@ static KIOEventStore *eventStore;
                 if (finishedUpload == nil || (onSuccess == nil && onError == nil)) return;
                 [finishedUpload addObject:cName];
                 if (error) finalError = error;
-//                NSLog(@"%lu collections finishedUpload: %@. Error: %@", totalNumberOfCollections, finishedUpload, finalError);
                 if (finishedUpload.count == totalNumberOfCollections) {
                     if (finalError) {
                         if (onError) onError(finalError.userInfo[@"code"], finalError.localizedDescription);
@@ -868,7 +867,6 @@ static KIOEventStore *eventStore;
             if (finishedUpload == nil || (completionHandler == nil)) return;
             [finishedUpload addObject:chunkIndex];
             if (error) finalError = error;
-//            NSLog(@"%lu chunks finishedUpload: %@. Error: %@", totalNumberOfChunks, finishedUpload, finalError);
             if (finishedUpload.count == totalNumberOfChunks) {
                 completionHandler(collectionName, finalError);
             }

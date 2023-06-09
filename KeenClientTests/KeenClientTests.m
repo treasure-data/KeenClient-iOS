@@ -745,8 +745,6 @@
 }
 
 - (void)testMaxUploadEventsAtOnceFailure {
-//    NSDictionary *result1 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
-//    NSDictionary *result2 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result3 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result4 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result5 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
@@ -772,8 +770,6 @@
 - (void)testMaxUploadEventsAtOncePartialFailureInCollection {
     NSDictionary *result1 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result2 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
-//    NSDictionary *result3 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
-//    NSDictionary *result4 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *result5 = [self buildResultWithSuccess:YES andErrorCode:nil andDescription:nil];
     NSDictionary *response1 = @{@"receipts": @[result1, result2]};
     NSDictionary *response2 = @{};
