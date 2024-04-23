@@ -1,4 +1,4 @@
-// swift-tools-version:5.1
+// swift-tools-version:5.3
 
 import PackageDescription
 
@@ -18,8 +18,7 @@ let package = Package(
     targets: [
       .target(
             name: "KeenClientTD",
-            dependencies: [
-            ],
+            dependencies: [],
             path: ".",
             exclude: [
                 "KeenClient.xcodeproj/",
@@ -37,6 +36,7 @@ let package = Package(
                 "KeenClient/",
                 "Library/sqlite-amalgamation/",
             ],
+            resources: [.copy("PrivacyInfo.xcprivacy")],
             publicHeadersPath: "KeenClient",
             cxxSettings: [
                 .headerSearchPath("Library/sqlite-amalgamation"),
