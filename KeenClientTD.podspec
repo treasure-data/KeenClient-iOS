@@ -12,7 +12,7 @@ Pod::Spec.new do |spec|
   DESC
   spec.source       = { git: 'https://github.com/treasure-data/KeenClient-iOS.git', tag: spec.version.to_s }
   spec.source_files = 'KeenClient/*.{h,m}'
-  s.resources       = 'PrivacyInfo.xcprivacy'
+  spec.resources    = 'PrivacyInfo.xcprivacy'
   spec.public_header_files = 'KeenClient/*.h'
   spec.requires_arc = true
 
