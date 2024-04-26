@@ -1,5 +1,10 @@
 # Change Log
 
+## version 4.1.1
+_2024-04-26_
+
+* Add PrivacyInfo.xcprivacy with User defaults, Disk usage and File timestamp reasons.
+
 ## version 4.1.0
 _2023-06-29_
 
